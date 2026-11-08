@@ -1,0 +1,9 @@
+[submodule "ext/Sherpa_Mini-Extruder"]
+	path = ext/Sherpa_Mini-Extruder
+	url = https://github.com/Annex-Engineering/Sherpa_Mini-Extruder.git
+[submodule "ext/SV08"]
+	path = ext/SV08
+	url = https://github.com/Sovol3d/SV08.git
+[submodule "ext/Goliath"]
+	path = ext/Goliath
+	url = https://github.com/VzBoT3D/Goliath.git
