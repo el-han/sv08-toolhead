@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+# groß und mit `python check.py --render` reproduzierbar
+out/check_assembly.step
