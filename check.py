@@ -16,7 +16,6 @@ from build123d import Compound, Location, Pos, export_step
 import basis as b
 import sherpa as sh
 
-PCB = ["adapter_plate"]
 FRONT5020 = ["5020_turbofan", "air_duct_5020", "cover_plate3", "M2_5X8"]
 FAN2515 = "2515_pipe_cooling_fan"
 
@@ -39,7 +38,6 @@ def removed_screw(label, p):
 def sv08_placed():
     """Verbleibende SV08-Teile an ihrer neuen Lage: (name, tag, shape)."""
     import goliath_traeger as gtr
-    import pcb_halter as ph
     out = []
     for label, p in b.sv08_parts():
         z = p.bounding_box().center().Z
@@ -47,15 +45,13 @@ def sv08_placed():
             out.append((label, "original", p))
             continue
         if "shoulder_screws" in label and "4xM3" in label:  # Platinen-Passschrauben
-            out.append((label, "Platinen vor", Pos(*ph.PCB_SHIFT) * p))
+            out.append((label, "original", p))
             continue
         if any(k in label for k in b.REMOVED_SHERPA):
             continue
         if removed_screw(label, p):
             continue
-        if any(k in label for k in PCB):
-            p, tag = Pos(*ph.PCB_SHIFT) * p, "Platinen vor"
-        elif any(k in label for k in FRONT5020):
+        if any(k in label for k in FRONT5020):
             p, tag = Pos(*gtr.FAN5020_SHIFT) * p, "5020 vor"
         elif FAN2515 in label:
             p, tag = Pos(gtr.FAN_SHIFT_X, 0, gtr.FAN_DZ) * p, "2515 verschoben"
@@ -110,8 +106,7 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
 
 
 # ---------------------------------------------------------------- Baum für check_assembly.step
-NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Goliath_Traeger": (0.15, 0.40, 0.85),
-              "Platinenhalter": (0.90, 0.80, 0.15)}
+NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Goliath_Traeger": (0.15, 0.40, 0.85)}
 SHERPA_COLORS = [("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
                  ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
                  ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
@@ -169,7 +164,7 @@ def _group(name, items):
     return g
 
 
-def assembly_tree(eb, gtr, ph, sv, sp):
+def assembly_tree(eb, gtr, sv, sp):
     """Baugruppe als Baum: Neuteile / Goliath / Sherpa / SV08 – mit Namen und Farben."""
     def pick(name, table, default):
         return next((c for k, c in table if k.lower() in name.lower()), default)
@@ -182,8 +177,7 @@ def assembly_tree(eb, gtr, ph, sv, sp):
         return out
 
     neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
-                              _named(gtr.traeger, "Goliath_Traeger", NEW_COLORS["Goliath_Traeger"]),
-                              _named(ph.halter, "Platinenhalter", NEW_COLORS["Platinenhalter"])])
+                              _named(gtr.traeger, "Goliath_Traeger", NEW_COLORS["Goliath_Traeger"])])
     gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
@@ -196,12 +190,11 @@ def assembly_tree(eb, gtr, ph, sv, sp):
 if __name__ == "__main__":
     import extruder_body as eb
     import goliath_traeger as gtr
-    import pcb_halter as ph
     import install_plate as ip
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Träger", gtr.traeger), ("Platinenhalter", ph.halter), ("Goliath", gtr.gol)]
+    new = [("Hauptkörper", eb.body), ("Träger", gtr.traeger), ("Goliath", gtr.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False
@@ -241,20 +234,18 @@ if __name__ == "__main__":
 
     if "--render" in sys.argv:
         from build123d import export_stl
-        for fname, obj in (("extruder_body_sherpa", eb.body), ("goliath_traeger", gtr.traeger),
-                           ("pcb_halter", ph.halter)):
+        for fname, obj in (("extruder_body_sherpa", eb.body), ("goliath_traeger", gtr.traeger)):
             obj.label = fname
             export_step(obj, str(b.OUT / f"{fname}.step"))
             export_stl(obj, str(b.OUT / f"{fname}.stl"), tolerance=0.01, angular_tolerance=0.1)
         ctx = [(p, "#b0b0b0", 0.30) for n, t, p in sv if -260 < p.bounding_box().center().Z < -90
                and p.bounding_box().size.Y < 120]
         ctx += [(p, "#c060c0", 0.8) for n, t, p in sp]
-        items = ctx + [(gtr.gol, "#d08030", 1.0), (gtr.traeger, "#2060d0", 1.0), (eb.body, "#20a060", 0.9),
-                       (ph.halter, "#d0c020", 1.0)]
+        items = ctx + [(gtr.gol, "#d08030", 1.0), (gtr.traeger, "#2060d0", 1.0), (eb.body, "#20a060", 0.9)]
         if "--png" in sys.argv:
           render(items, str(b.OUT / "ansicht_baugruppe.png"),
                [(10, -90, "vorne"), (10, 0, "rechts (+X)"), (25, -130, "iso")])
           render([(eb.body, "#20a060", 1.0)], str(b.OUT / "ansicht_hauptkoerper.png"),
                [(20, -60, "vorne"), (20, 120, "hinten")])
-        export_step(assembly_tree(eb, gtr, ph, sv, sp), str(b.OUT / "check_assembly.step"))
+        export_step(assembly_tree(eb, gtr, sv, sp), str(b.OUT / "check_assembly.step"))
         print("check_assembly.step geschrieben")

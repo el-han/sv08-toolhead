@@ -16,9 +16,6 @@ CLR = 0.4
 MX, MZ = sh.MOTOR_AX
 MOTOR_R = 18.25 + CLR
 
-# Für den Platinenhalter (Lage der bisherigen Sherpa-Kernvorderseite)
-PCB_INSERTS = [(-356.0, -134.0), (-315.0, -143.0)]
-CORE_FRONT_Y = sh.Y0 - 17.5
 
 
 def build():
