@@ -25,6 +25,10 @@ ob = orig.bounding_box()
 Y_BACK = ob.max.Y
 # Bohrungen des alten Motors (Mitte und Laschen) -> zu
 OLD_MOTOR_HOLES = [(-342.0, -143.7), (-322.65, -133.35), (-361.35, -153.95)]
+# Oval-Ansatz vorne (steht von y 240.05 bis zur Plattenfläche 242.3 vor) und seine Bohrungen
+Y_FRONT = 242.2747          # Vorderfläche der Platte (Original)
+OVAL_C, OVAL_BOX = (-336.0, (239.0 + Y_FRONT) / 2, -190.7), (17.0, Y_FRONT - 239.0, 7.5)
+OVAL_HOLES = [(-340.7, -190.65), (-331.15, -190.65)]
 RINNE = Pos(-321.0, 249.0, -187.67) * Box(10, 12, 3.10)    # Tasche 17, Mitte bleibt offen
 
 
@@ -75,6 +79,20 @@ def stepped_cylinder(part, clr, step=0.5):
     return out
 
 
+def unify(solid):
+    """Flächen gleicher Geometrie zusammenführen (Nähte gefüllter Taschen entfernen).
+    Fällt auf das Original zurück, wenn das Ergebnis ungültig ist."""
+    from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
+    u = ShapeUpgrade_UnifySameDomain(solid.wrapped, True, True, True)
+    u.Build()
+    out = Solid(u.Shape())
+    if out.is_valid and abs(out.volume - solid.volume) < 0.01:
+        print(f"Flächen vereinigt: {len(solid.faces())} -> {len(out.faces())}")
+        return out
+    print("Flächen vereinigen ergab ungültigen Körper, unverändert")
+    return solid
+
+
 def build():
     front_box = Pos(ob.center().X, (ob.min.Y - 1 + Y_SKIN) / 2, ob.center().Z) * Box(BIG, Y_SKIN - ob.min.Y + 1, BIG)
     front = _solid(Compound(list(orig.intersect(front_box))))
@@ -118,8 +136,19 @@ def build():
     back = back - RINNE
     print("Funktionstaschen aus:", ", ".join(sorted({n for n, _ in cutters})))
 
-    plate = _solid((front + back).clean())
-    return plate
+    plate = front + back
+
+    # Vorderseite vereinfachen:
+    # (a) zahnradförmige Aussparung des alten Motorsitzes füllen
+    plate = plate + Pos(-342.0, Y_FRONT, -143.7) * Rot(-90, 0, 0) * Cylinder(
+        16.6, Y_SKIN + 0.2 - Y_FRONT, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    # (b) Oval-Ansatz mit zwei Bohrungen entfernen und Bohrungen/Schlitze füllen
+    plate = plate - Pos(*OVAL_C) * Box(*OVAL_BOX)
+    for x, z in OVAL_HOLES:
+        plate = plate + Pos(x, Y_FRONT, z) * Rot(-90, 0, 0) * Cylinder(2.0, Y_BACK - Y_FRONT, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    plate = plate + Pos(-336.0, (Y_FRONT + Y_BACK) / 2, -190.7) * Box(4.8, Y_BACK - Y_FRONT, 1.8)
+    plate = _solid(plate.clean())
+    return unify(plate)
 
 
 plate = build()

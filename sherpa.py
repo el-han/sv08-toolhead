@@ -8,7 +8,7 @@ Sherpa-Koordinaten: Filament läuft in Y bei (x=4.3, z=6.0), Motorachse in Z,
 Motor-Anlagefläche bei z=-7, Motor bei y=+13.85 über der Antriebswelle.
 Abbildung: X_sh -> X, Y_sh -> Z (Motor oben), Z_sh -> -Y (Motor hinten).
 """
-from build123d import Location, Pos, Rot, import_step
+from build123d import Compound, Location, Pos, Rot, import_step
 
 import basis as b
 
@@ -43,12 +43,43 @@ _NAMES = {
 }
 
 
+# Sprechende Namen für die Blätter des Sherpa-STEP (Label-Anfang -> Name)
+_LABELS = [
+    ("shaft", "welle"), ("0_3mm_shim", "passscheibe_0_3"), ("sherpa_mini_gear_50t", "zahnrad_50z"),
+    ("filament_gear", "antriebsrad"), ("MR85-2RS", "lager_MR85"), ("m3_set_screw", "madenschraube_M3"),
+    ("idler_pin", "idler_stift"), ("idler_gear", "idler_rad"), ("needle_bearing", "nadellager"),
+    ("insert_m3x5x4", "einschmelzmutter_M3"), ("thumbscrew", "raendelschraube"), ("spring", "feder"),
+    ("NEMA14_10t", "motor"),
+]
+_SCREWS = {111: "schraube_M3x12_motor", 140: "schraube_M3x16_gehaeuse", 83: "schraube_M3x8_deckel"}
+
+
+def _leaves(n):
+    ch = list(n.children)
+    return [n] if not ch else [l for c in ch for l in _leaves(c)]
+
+
 def _load():
+    """Liste (name, shape) je Blatt des STEP-Baums. Die globalen Volumenkörper kommen aus
+    asm.solids() (gleiche Reihenfolge wie die Blätter, Lage bereits aufgelöst)."""
     asm = import_step(str(b.SHERPA_STEP))
-    parts = []
-    for s in asm.solids():
-        name = next((n for v, n in _NAMES.items() if abs(s.volume - v) < 2), "teil")
-        parts.append((name, T * s))
+    solids = asm.solids()
+    parts, i = [], 0
+    for leaf in _leaves(asm):
+        k = len(leaf.solids())
+        group = [T * s for s in solids[i:i + k]]
+        i += k
+        lab = leaf.label.split("^")[0]
+        vol = sum(s.volume for s in group)
+        name = next((n for v, n in _NAMES.items() if abs(vol - v) < 2), None)
+        if name is None and "screw" in lab:
+            name = next((n for v, n in _SCREWS.items() if abs(vol - v) < 2), None)
+        if name is None:
+            name = next((n for key, n in _LABELS if lab.startswith(key)), lab)
+            if name == "welle":
+                name = "antriebswelle" if vol > 300 else "idler_welle"
+        shape = group[0] if k == 1 else Compound(group)
+        parts.append((name, shape))
     return parts
 
 
@@ -59,13 +90,13 @@ def get(name):
     return [p for n, p in parts if n == name]
 
 
-# Teile, die im Umbau entfallen bzw. ersetzt werden
-UNUSED = {"housing_front_k", "idler_arm_long"}
+# Teile, die im Umbau entfallen bzw. ersetzt werden (neues Gehäuse folgt)
+UNUSED = {"housing_core", "housing_rear", "housing_front", "housing_front_k", "idler_arm_long",
+          "einschmelzmutter_M3", "schraube_M3x12_motor", "schraube_M3x16_gehaeuse", "schraube_M3x8_deckel"}
 
 if __name__ == "__main__":
     print(f"Motorachse x={MOTOR_AX[0]:.2f} z={MOTOR_AX[1]:.2f}, Anlagefläche y={MOTOR_FACE_Y:.2f}")
     print(f"Gehäuse-Unterkante z={Z_HOUSING_BOT:.2f}")
     for n, p in parts:
-        if n != "teil":
-            bb = p.bounding_box()
-            print(f"{n:16s} ({bb.min.X:.1f},{bb.min.Y:.1f},{bb.min.Z:.1f})-({bb.max.X:.1f},{bb.max.Y:.1f},{bb.max.Z:.1f})")
+        bb = p.bounding_box()
+        print(f"{n:16s} ({bb.min.X:.1f},{bb.min.Y:.1f},{bb.min.Z:.1f})-({bb.max.X:.1f},{bb.max.Y:.1f},{bb.max.Z:.1f})")

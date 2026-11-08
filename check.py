@@ -11,7 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from build123d import Compound, Pos, export_step
+from build123d import Compound, Location, Pos, export_step
 
 import basis as b
 import sherpa as sh
@@ -44,10 +44,10 @@ def sv08_placed():
     for label, p in b.sv08_parts():
         z = p.bounding_box().center().Z
         if "M3x12" in label and z < -196:                 # Sensor-/Deflektorschrauben bleiben
-            out.append((b.short(label), "original", p))
+            out.append((label, "original", p))
             continue
         if "shoulder_screws" in label and "4xM3" in label:  # Platinen-Passschrauben
-            out.append((b.short(label), "Platinen vor", Pos(*ph.PCB_SHIFT) * p))
+            out.append((label, "Platinen vor", Pos(*ph.PCB_SHIFT) * p))
             continue
         if any(k in label for k in b.REMOVED_SHERPA):
             continue
@@ -61,17 +61,12 @@ def sv08_placed():
             p, tag = Pos(gtr.FAN_SHIFT_X, 0, gtr.FAN_DZ) * p, "2515 verschoben"
         else:
             tag = "original"
-        out.append((b.short(label), tag, p))
+        out.append((label, tag, p))
     return out
 
 
 def sherpa_placed():
-    # entfallen: Gehäuse (neues folgt), Einschmelzmuttern (V~46), Motorschrauben M3x12 (V~111),
-    # Gehäuseschrauben M3x16 (V~140), Deckelschrauben M3x8 (V~83)
-    drop = (46, 111, 140, 83)
-    return [(f"sherpa_{n}", "Sherpa", p) for n, p in sh.parts
-            if n not in sh.UNUSED and not n.startswith("housing")
-            and not (n == "teil" and any(abs(p.volume - v) < 1.5 for v in drop))]
+    return [(f"sherpa_{n}", "Sherpa", p) for n, p in sh.parts if n not in sh.UNUSED]
 
 
 def overlap(a, c):
@@ -114,6 +109,90 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
     fig.savefig(fname, dpi=110)
 
 
+# ---------------------------------------------------------------- Baum für check_assembly.step
+NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Goliath_Traeger": (0.15, 0.40, 0.85),
+              "Platinenhalter": (0.90, 0.80, 0.15)}
+SHERPA_COLORS = [("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
+                 ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
+                 ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
+SV08_COLORS = [("turbofan", (0.12, 0.12, 0.12)), ("cooling_fan", (0.12, 0.12, 0.12)), ("duct", (0.55, 0.75, 0.90)),
+               ("deflector", (0.55, 0.75, 0.90)), ("cover_plate", (0.55, 0.75, 0.90)), ("adapter_plate", (0.20, 0.45, 0.20)),
+               ("proximity", (0.85, 0.45, 0.10)), ("sliding", (0.55, 0.55, 0.60)), ("MGN", (0.70, 0.70, 0.72)),
+               ("screw", (0.80, 0.80, 0.82)), ("magnet", (0.40, 0.40, 0.45))]
+
+
+def _named(shape, name, rgb):
+    from build123d import Color
+    s = shape.moved(Location()) if hasattr(shape, "moved") else shape
+    s.label = name
+    s.color = Color(*rgb)
+    for i, c in enumerate(getattr(s, "children", ()) or ()):   # mehrteilige Teile (Lager)
+        c.color = Color(*rgb)
+        c.label = f"{name}_{i + 1}"
+    return s
+
+
+NAME_OVERRIDES = [
+    ("3x8_4xM3", "passschraube_M3x8_platinen"), ("2_5x5xM2", "passschraube_M2_5x5"),
+    ("plain_washer", "unterlegscheibe"), ("proximity_switch", "induktivsensor_H2N"),
+    ("MGN12H", "MGN12H_wagen"), ("2515_pipe_cooling_fan", "luefter_2515_hotend"),
+    ("3010_turbofan", "luefter_3010_turbo"), ("5020_turbofan", "luefter_5020_bauteil"),
+    ("ptfe_tube_quick_coupling", "ptfe_schnellverbinder"), ("quick_plug_adapter", "ptfe_klammer"),
+    ("length16mm", "ptfe_schlauch_16mm"), ("inner_diameter2mm_ptfe", "ptfe_schlauch"),
+]
+
+
+def nice_name(label):
+    """Lesbarer Name aus den teils verstümmelten Sovol-Labels."""
+    import re
+    a = re.sub(r"[^ -~]", "", label or "")
+    low = a.lower()
+    for key, name in NAME_OVERRIDES:
+        if key in a:
+            return name
+    m = re.search(r"M\d(?:_\d)?[xX]\d+", a)
+    if m and "screw" in low:
+        kind = ("senkkopf" if "countersunk" in low else "passschraube" if "shoulder" in low
+                else "madenschraube" if "set_screw" in low else "zylinderkopf")
+        return f"schraube_{m.group(0).replace('X', 'x')}_{kind}"
+    s = re.sub(r"^[A-Z0-9]+-[0-9]+-[a-z]_", "", a)
+    s = re.sub(r"^SV05p", "", s)
+    s = re.sub(r"^[^A-Za-z]+", "", s)
+    if s.startswith("xtruder"):
+        s = "e" + s
+    return s.strip("_")[:40] or "teil"
+
+
+def _group(name, items):
+    g = Compound(children=items)
+    g.label = name
+    return g
+
+
+def assembly_tree(eb, gtr, ph, sv, sp):
+    """Baugruppe als Baum: Neuteile / Goliath / Sherpa / SV08 – mit Namen und Farben."""
+    def pick(name, table, default):
+        return next((c for k, c in table if k.lower() in name.lower()), default)
+
+    def unique(items):
+        seen, out = {}, []
+        for n, p, c in items:
+            seen[n] = seen.get(n, 0) + 1
+            out.append(_named(p, n if seen[n] == 1 else f"{n}_{seen[n]}", c))
+        return out
+
+    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
+                              _named(gtr.traeger, "Goliath_Traeger", NEW_COLORS["Goliath_Traeger"]),
+                              _named(ph.halter, "Platinenhalter", NEW_COLORS["Platinenhalter"])])
+    gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
+    sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
+                                    for n, t, p in sp]))
+    sv_items = unique([(nice_name(n), p, pick(n, SV08_COLORS, (0.70, 0.70, 0.70))) for n, t, p in sv])
+    sv08 = _group("SV08", sv_items)
+    root = _group("SV08_Sherpa_Goliath", [neu, gol, sher, sv08])
+    return root
+
+
 if __name__ == "__main__":
     import extruder_body as eb
     import goliath_traeger as gtr
@@ -135,8 +214,7 @@ if __name__ == "__main__":
         for label, p in b.sv08_parts():
             if "xtruder_install_plate" not in label:
                 base_plate[id(p)] = overlap(ip.orig, p)
-        housing = sh.get("housing_core") + sh.get("housing_rear")
-        base_sherpa = {id(p): sum(overlap(h, p) for h in housing) for _, _, p in sp}
+        base_sherpa = {}
         bad = False
         others = [(n, t, p) for n, t, p in sv + sp]
         for oname, obj in new:
@@ -178,6 +256,5 @@ if __name__ == "__main__":
                [(10, -90, "vorne"), (10, 0, "rechts (+X)"), (25, -130, "iso")])
           render([(eb.body, "#20a060", 1.0)], str(b.OUT / "ansicht_hauptkoerper.png"),
                [(20, -60, "vorne"), (20, 120, "hinten")])
-        export_step(Compound([eb.body, gtr.traeger, ph.halter, gtr.gol] + [p for _, _, p in sv + sp]),
-                    str(b.OUT / "check_assembly.step"))
+        export_step(assembly_tree(eb, gtr, ph, sv, sp), str(b.OUT / "check_assembly.step"))
         print("check_assembly.step geschrieben")
