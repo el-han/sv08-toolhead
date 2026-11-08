@@ -1,124 +1,115 @@
 """
-Goliath-Hotend-Träger für Sovol SV08 (planetarer Original-Extruder).
+Goliath-Träger für den Sherpa-Umbau des Sovol SV08.
 
-Ersetzt den originalen Alu-Kühlblock (JXHSV08-06022). Oben übernimmt der
-Träger exakt dessen zwei Zinken, die die Nase des Extruder-Getriebegehäuses
-umgreifen und mit den originalen 2x M3x16 quer verschraubt werden. Darunter
-hängt das Mellow/VzBoT Goliath (luftgekühlt) an einer Platte.
+Platte unter dem Sherpa-Gehäuse. Das Goliath (luftgekühlt) wird von oben mit
+3x M2,5 angeschraubt (Köpfe versenkt), danach wird der Träger von unten mit
+3x M3 an den Hauptkörper geschraubt (Gewindeeinsätze im Hauptkörper).
+Dazu: Ohr für den 2515-Hotendlüfter, Auge für die M2,5 des 5020-Lüfters.
 
-Koordinaten = Koordinatensystem der Sovol-STEP-Baugruppe (mm), damit alles
-direkt gegen das Original geprüft werden kann.
-
-Aufruf:  .venv\\Scripts\\python goliath_traeger.py
-Ausgabe: out/goliath_traeger.step / .stl, out/check_assembly.step
+Koordinaten = Sovol-STEP-Baugruppe (mm). Düse liegt auf Originalposition.
 """
-from pathlib import Path
+import math
 
-from build123d import (
-    Axis, Box, Compound, Cylinder, Location, Pos, Rot, import_step,
-    export_step, export_stl, Align,
-)
+from build123d import Align, Box, Cylinder, Pos, Rot, export_step, export_stl, import_step
 
-ROOT = Path(__file__).parent
-SV08_STEP = ROOT / "ext/SV08/STEP/JXHSV08-06000 挤出喷头组件（行星）hotend assembly planetary.step"
-GOLIATH_STEP = ROOT / "ext/Goliath/CAD/Goliath Mockup AIR.STEP"
-OUT = ROOT / "out"
+import basis as b
+import sherpa as sh
+
+MIN = (Align.CENTER, Align.CENTER, Align.MIN)
 
 # ---------------------------------------------------------------- Parameter
-AX_X, AX_Y = -335.70, 225.05     # Filamentachse (aus Original-STEP)
-Z_GC = -166.07                   # Unterkante Nase Getriebegehäuse
-PLATE_T = 5.0                    # Plattenstärke unter dem Getriebegehäuse
-PLATE_R = 12.5                   # Radius der Platte um die Achse
-BLOCK_X = (-342.70, -328.70)     # Grundriss Original-Kühlblock
-BLOCK_Y = (215.05, 240.05)
+AX_X, AX_Y = b.AX_X, b.AX_Y
+Z_TOP = sh.Z_HOUSING_BOT              # Anlage am Gehäuse
+T = sh.CARRIER_T
+Z_BOT = Z_TOP - T
 
-FAN_FACE_X = -324.30             # neue Anlagefläche 2515-Lüfter (Original -328.70)
-EAR_TOP = -160.0                 # Oberkante Lüfter-Ohr
-FAN_HOLES = [(217.55, -167.57), (237.55, -167.57)]  # (y, z) Original-Lage
-FAN_HOLE_D = 2.2                 # M2,5 selbstschneidend in ASA
-FAN_HOLE_DEPTH = 7.0
-
-GOLIATH_ROT = 135.0              # Drehung um Z: Heizpatrone zeigt nach +X
-GOLIATH_TOP = 43.50              # lokale Oberkante Goliath-Kühlkörper
-GOLIATH_TIP = -25.75             # lokale Düsenspitze
-GOL_SCREW_R = 8.0                # Lochkreis 4x M2,5 (Quadrat 11,32)
-GOL_SCREWS_DEG = [0, 90, 270]    # bei 180 deg kollidiert der Kopf mit Zinke + M3-Kopf
-SCREW_D = 2.9                    # Durchgang M2,5
-HEAD_D = 5.0                     # Kopfsenkung DIN 912 M2,5 (Kopf 4,5)
-HEAD_DEPTH = 2.6
 PTFE_D = 4.15
-INLET_D, INLET_DEPTH = 4.6, 1.4  # Zentrierung auf Goliath-Einlass
+INLET_D, INLET_DEPTH = 4.6, 1.4       # Zentrierung auf Goliath-Einlass
 
-ORIG_NOZZLE_Z = -224.07
+GOLIATH_ROT = 135.0                   # Heizpatrone zeigt nach +X
+GOLIATH_TOP = 43.50
+GOLIATH_TIP = -25.75
+GOL_SCREW_R = 8.0
+GOL_SCREWS_DEG = [0, 90, 270]
+SCREW_D, HEAD_D, HEAD_DEPTH = 2.9, 5.0, 2.6     # M2,5 DIN 912
 
-# ---------------------------------------------------------------- Laden
-def load_parts(path):
-    asm = import_step(str(path))
-    return {c.label: c for c in asm.children}
+# Befestigung am Hauptkörper: M3 von unten, Kopf ISO 7380/DIN 912 Ø5,5
+M3_HOLES = [(-354.05, 225.05), (-345.0, 236.0), (-328.0, 236.0)]
+M3_D, M3_HEAD_D = 3.3, 6.0
 
-def find(parts, key):
-    hits = [p for l, p in parts.items() if key in l]
-    assert hits, key
-    return hits
+# 2515-Hotendlüfter (Original-Lüfter, an +X-Seite)
+FAN_FACE_X = -324.30
+FAN_SHIFT_X = FAN_FACE_X - (-328.70)
+FAN_DZ = 12.0                         # Lüfter mittig vor den Kühlkörper (über dem Heizblock)
+FAN_HOLES = [(217.55, -167.57 + FAN_DZ), (237.55, -167.57 + FAN_DZ)]   # (y, z) Lochlage am Lüfter
+FAN_HOLE_D, FAN_HOLE_DEPTH = 2.2, 7.0
+EAR_Y = (215.05, 240.05)
+EAR_X = (-329.0, FAN_FACE_X)
 
-sv08 = load_parts(SV08_STEP)
-block = find(sv08, "ooling_aluminum_block")[0]
+# 5020-Bauteillüfter: eine M2,5 in Y-Richtung (Originalstelle, Lüfter 1 mm vor)
+FAN5020_SHIFT = (0.0, -2.0, 0.0)
+FAN5020_HOLE = (-360.85, -166.95)     # (x, z)
+FAN5020_BACK_Y = 214.70 + FAN5020_SHIFT[1]
 
 # ---------------------------------------------------------------- Träger
-z_plate_bot = Z_GC - PLATE_T
-big = 200
-_cut = Pos(AX_X, AX_Y, Z_GC + big / 2) * Box(big, big, big)
-prongs = None
-for s in block.solids():
-    for r in s.intersect(_cut).solids():
-        prongs = r if prongs is None else prongs + r
+def build():
+    plate = Pos(AX_X, AX_Y, Z_BOT) * Cylinder(13.0, T, align=MIN)
+    # Steg nach hinten zu den beiden hinteren M3 und nach links zur linken M3
+    plate += Pos(-336.5, 233.0, Z_BOT) * Box(25.0, 12.0, T, align=MIN)
+    plate += Pos(-347.0, 225.05, Z_BOT) * Box(20.0, 12.0, T, align=MIN)
+    for x, y in M3_HOLES:
+        plate += Pos(x, y, Z_BOT) * Cylinder(4.0, T, align=MIN)
+    # Ohr für 2515 (reicht bis unter die Lüfterbohrungen)
+    ear_top = Z_TOP
+    ear_bot = FAN_HOLES[0][1] - 4.0
+    plate += Pos(sum(EAR_X) / 2, sum(EAR_Y) / 2, ear_bot) * Box(
+        EAR_X[1] - EAR_X[0], EAR_Y[1] - EAR_Y[0], ear_top - ear_bot, align=MIN)
+    plate += Pos(-331.0, sum(EAR_Y) / 2, Z_BOT) * Box(6.0, EAR_Y[1] - EAR_Y[0], T, align=MIN)
+    # Auge für 5020 (links vorne, hängt vom Träger nach unten)
+    ex, ez = FAN5020_HOLE
+    eye_y0 = FAN5020_BACK_Y
+    plate += Pos(ex, eye_y0 + 3.0, ez - 4.0) * Box(7.0, 6.0, Z_TOP - (ez - 4.0), align=MIN)
+    plate += Pos(-355.0, 219.0, Z_BOT) * Box(12.0, 9.0, T, align=MIN)
 
-plate = Pos(AX_X, AX_Y, z_plate_bot) * Cylinder(PLATE_R, PLATE_T, align=(Align.CENTER, Align.CENTER, Align.MIN))
-plate += Pos((BLOCK_X[0] + FAN_FACE_X) / 2, sum(BLOCK_Y) / 2, z_plate_bot) * Box(
-    FAN_FACE_X - BLOCK_X[0], BLOCK_Y[1] - BLOCK_Y[0], PLATE_T, align=(Align.CENTER, Align.CENTER, Align.MIN))
-ear_x0 = BLOCK_X[1] - 0.3
-ear = Pos((ear_x0 + FAN_FACE_X) / 2, sum(BLOCK_Y) / 2, Z_GC) * Box(
-    FAN_FACE_X - ear_x0, BLOCK_Y[1] - BLOCK_Y[0], EAR_TOP - Z_GC, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    # Filamentkanal + Zentrierung
+    plate -= Pos(AX_X, AX_Y, Z_BOT - 1) * Cylinder(PTFE_D / 2, T + 2, align=MIN)
+    plate -= Pos(AX_X, AX_Y, Z_BOT) * Cylinder(INLET_D / 2, INLET_DEPTH, align=MIN)
+    # Goliath-Schrauben (von oben, Köpfe versenkt)
+    for deg in GOL_SCREWS_DEG:
+        x = AX_X + GOL_SCREW_R * math.cos(math.radians(deg))
+        y = AX_Y + GOL_SCREW_R * math.sin(math.radians(deg))
+        plate -= Pos(x, y, Z_BOT - 1) * Cylinder(SCREW_D / 2, T + 2, align=MIN)
+        plate -= Pos(x, y, Z_TOP - HEAD_DEPTH) * Cylinder(HEAD_D / 2, 10, align=MIN)
+    # M3 zum Hauptkörper
+    for x, y in M3_HOLES:
+        plate -= Pos(x, y, Z_BOT - 1) * Cylinder(M3_D / 2, T + 2, align=MIN)
+    # 2515-Gewindelöcher (von +X)
+    for y, z in FAN_HOLES:
+        plate -= Pos(FAN_FACE_X + 0.1, y, z) * Rot(0, -90, 0) * Cylinder(
+            FAN_HOLE_D / 2, FAN_HOLE_DEPTH + 0.1, align=MIN)
+    # 5020-Gewindeloch (von vorne, -Y)
+    plate -= Pos(ex, eye_y0 - 0.1, ez) * Rot(-90, 0, 0) * Cylinder(FAN_HOLE_D / 2, 7.0, align=MIN)
+    # Freiraum zum 2515-Lüfter (liegt mit Oberkante knapp unter dem Träger)
+    plate -= Pos(FAN_FACE_X, sum(EAR_Y) / 2, Z_BOT - 20) * Box(30, 40, 20 + T + 1, align=(Align.MIN, Align.CENTER, Align.MIN))
+    # Freiraum für den Goliath selbst (Kühlkörper-Oberseite liegt plan an)
+    return plate
 
-traeger = prongs + plate + ear
 
-# Filamentkanal + Zentrierung
-traeger -= Pos(AX_X, AX_Y, z_plate_bot - 1) * Cylinder(PTFE_D / 2, 30, align=(Align.CENTER, Align.CENTER, Align.MIN))
-traeger -= Pos(AX_X, AX_Y, z_plate_bot) * Cylinder(INLET_D / 2, INLET_DEPTH, align=(Align.CENTER, Align.CENTER, Align.MIN))
+def place_goliath():
+    gol = import_step(str(b.GOLIATH_STEP))
+    dz = Z_BOT - GOLIATH_TOP
+    return Pos(AX_X, AX_Y, dz) * Rot(0, 0, GOLIATH_ROT) * gol, GOLIATH_TIP + dz
 
-# Goliath-Schrauben (lokale Lochlage 45 deg + Drehung -> Achsen)
-import math
-for deg in GOL_SCREWS_DEG:
-    x = AX_X + GOL_SCREW_R * math.cos(math.radians(deg))
-    y = AX_Y + GOL_SCREW_R * math.sin(math.radians(deg))
-    traeger -= Pos(x, y, z_plate_bot - 1) * Cylinder(SCREW_D / 2, 30, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    traeger -= Pos(x, y, z_plate_bot + PLATE_T - HEAD_DEPTH) * Cylinder(HEAD_D / 2, 30, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-# 2515-Lüfter-Gewindelöcher (von +X)
-for y, z in FAN_HOLES:
-    traeger -= Pos(FAN_FACE_X + 0.1, y, z) * Rot(0, -90, 0) * Cylinder(
-        FAN_HOLE_D / 2, FAN_HOLE_DEPTH + 0.1, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-# Durchgang für die Spitzen der originalen M3x16 (Klemmung Getriebegehäuse)
-for y in (220.55, 229.55):
-    traeger -= Pos(FAN_FACE_X - 6, y, -161.07) * Rot(0, 90, 0) * Cylinder(1.7, 12)
-
-# Passform für den Ansatz des verschobenen 2515-Lüfters
-fan2515 = Pos(FAN_FACE_X - BLOCK_X[1], 0, 0) * find(sv08, "2515_pipe_cooling_fan")[0]
-for s in fan2515.solids():
-    traeger -= s
-
-# ---------------------------------------------------------------- Goliath platzieren
-gol = import_step(str(GOLIATH_STEP))
-dz = z_plate_bot - GOLIATH_TOP
-gol = Pos(AX_X, AX_Y, dz) * Rot(0, 0, GOLIATH_ROT) * gol
-nozzle_z = GOLIATH_TIP + dz
-DROP = ORIG_NOZZLE_Z - nozzle_z
+traeger = build()
+gol, nozzle_z = place_goliath()
+gol_solid = gol.solids()[0]
+traeger = traeger - gol_solid
 
 if __name__ == "__main__":
-    OUT.mkdir(exist_ok=True)
+    b.OUT.mkdir(exist_ok=True)
     traeger.label = "goliath_traeger"
-    export_step(traeger, str(OUT / "goliath_traeger.step"))
-    export_stl(traeger, str(OUT / "goliath_traeger.stl"), tolerance=0.01, angular_tolerance=0.1)
-    print(f"Düsenspitze neu z={nozzle_z:.2f}  (Original {ORIG_NOZZLE_Z})  -> {DROP:.2f} mm tiefer")
+    export_step(traeger, str(b.OUT / "goliath_traeger.step"))
+    export_stl(traeger, str(b.OUT / "goliath_traeger.stl"), tolerance=0.01, angular_tolerance=0.1)
+    print(f"Düsenspitze z={nozzle_z:.2f} (Original {b.ORIG_NOZZLE_Z})")
     print(f"Volumen Träger: {traeger.volume:.0f} mm^3, bbox {traeger.bounding_box().size}")
