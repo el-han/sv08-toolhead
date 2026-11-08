@@ -24,6 +24,20 @@ CORE_FRONT_Y = sh.Y0 - 17.5
 def build():
     body = ip.plate
     body -= Pos(MX, sh.MOTOR_FACE_Y, MZ) * Rot(-90, 0, 0) * Cylinder(MOTOR_R, 60, align=MIN)
+    # Motorkontur mit Luft (Befestigungslaschen liegen auf Plattenhöhe)
+    motor = sh.get("motor")[0]
+    for d in ((0, 0, 0), (CLR, 0, 0), (-CLR, 0, 0), (0, CLR, 0), (0, -CLR, 0), (0, 0, CLR), (0, 0, -CLR)):
+        body -= Pos(*d) * motor
+    # Ritzel + Zentrierbund des Motors vor der Anlagefläche
+    body -= Pos(MX, sh.MOTOR_FACE_Y, MZ) * Rot(90, 0, 0) * Cylinder(8.0 + CLR, 8.0, align=MIN)
+    # 50er-Zahnrad und hinteres Lager auf der Antriebswelle (ragen seit dem Umdrehen in die Platte)
+    for n in ("zahnrad_50z", "lager_MR85"):
+        for p in sh.get(n):
+            pb = p.bounding_box()
+            if pb.max.Y > 239.0:
+                r = max(pb.size.X, pb.size.Z) / 2 + CLR + 0.2
+                body -= Pos(pb.center().X, pb.min.Y - CLR, pb.center().Z) * Rot(-90, 0, 0) * Cylinder(
+                    r, pb.size.Y + 2 * CLR, align=MIN)
     return max(body.clean().solids(), key=lambda s: s.volume)
 
 

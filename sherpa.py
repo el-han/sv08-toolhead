@@ -12,7 +12,12 @@ from build123d import Compound, Location, Pos, Rot, import_step
 
 import basis as b
 
-FIL_SH = (4.3, 6.0)          # Filamentachse im Sherpa (x, z)
+# Antriebsrad und Idler-Rad sind gegenüber dem Original umgedreht (180° um eine Querachse
+# in ihrer Mittelebene z=10). Die Filamentrille liegt dadurch bei z=14 statt z=6, der ganze
+# Sherpa samt Motor sitzt 8 mm weiter hinten.
+FLIP_Z = 10.0
+FLIPPED = {"antriebsrad", "idler_rad", "nadellager", "madenschraube_M3"}
+FIL_SH = (4.3, 2 * FLIP_Z - 6.0)   # Filamentachse im Sherpa (x, z)
 MOTOR_SH_Y = 13.85           # Motorachse über der Antriebswelle (y_sh)
 HOUSING_BOT_SH = -13.5       # Unterkante Gehäusekern (y_sh)
 MOTOR_FACE_SH = -7.0
@@ -27,6 +32,9 @@ X0 = b.AX_X - FIL_SH[0]
 Y0 = b.AX_Y + FIL_SH[1]                      # y_sv = Y0 - z_sh
 
 T = Location((X0, Y0, Z0)) * Rot(90, 0, 0)   # Rx(90): y->z, z->-y
+
+
+FLIP = Location((0, 0, FLIP_Z)) * Rot(180, 0, 0) * Location((0, 0, -FLIP_Z))
 
 
 def to_sv(x, y, z):
@@ -67,7 +75,7 @@ def _load():
     parts, i = [], 0
     for leaf in _leaves(asm):
         k = len(leaf.solids())
-        group = [T * s for s in solids[i:i + k]]
+        group = list(solids[i:i + k])
         i += k
         lab = leaf.label.split("^")[0]
         vol = sum(s.volume for s in group)
@@ -78,6 +86,8 @@ def _load():
             name = next((n for key, n in _LABELS if lab.startswith(key)), lab)
             if name == "welle":
                 name = "antriebswelle" if vol > 300 else "idler_welle"
+        flip = FLIP if name in FLIPPED else Location()
+        group = [T * flip * s for s in group]
         shape = group[0] if k == 1 else Compound(group)
         parts.append((name, shape))
     return parts
