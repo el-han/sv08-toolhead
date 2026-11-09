@@ -38,7 +38,6 @@ def largest(y):
 
 
 LAYERS = {
-    "FRONT": 242.5,   # Vorderfläche (y 242.27..242.87), rundum schmaler
     "BODY": 244.0,    # Plattenkörper, voller Umriss
     "BACK": 245.0,    # ab Hautmitte nach hinten: seitliche Aussparungen für das Sliding Panel
 }

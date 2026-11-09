@@ -7,7 +7,7 @@ Original-STEP werden nur Koordinaten übernommen, keine Geometrie.
 
 Schichten (y, von vorne nach hinten):
   Auflagen      Y_PAD   .. Y_FRONT   5 kleine Auflagen auf der Vorderseite
-  Vorderfläche  Y_FRONT .. Y_STEP    rundum etwas schmaler (Absatz)
+  Vorderfläche  Y_FRONT .. Y_STEP    Körperumriss um FRONT_INSET nach innen versetzt
   Körper        Y_STEP  .. Y_NOTCH   voller Umriss
   Rückseite     Y_NOTCH .. Y_BACK    seitliche Aussparungen für das Sliding Panel
 
@@ -16,7 +16,7 @@ Sitz und Bohrungen des alten Motors, Zahnrad-Aussparung, Oval-Ansatz.
 Funktionstaschen für Schrauben, die in die Rückseite ragen, werden aus den
 Nachbarteilen bestimmt (glatte Stufenzylinder mit Luft CLR).
 """
-from build123d import (Align, Box, Compound, Cylinder, Edge, Face, Pos, Rot, Solid, Vector, Wire,
+from build123d import (Align, Box, Compound, Cylinder, Edge, Face, Kind, Pos, Rot, Solid, Vector, Wire,
                        export_step, extrude)
 
 import basis as b
@@ -32,7 +32,7 @@ Y_FRONT = 242.2747
 Y_STEP = 242.8747
 Y_NOTCH = 245.0
 Y_BACK = 250.7747
-Y_FRONT_ORIG = Y_FRONT       # für andere Module
+FRONT_INSET = 1.466          # Absatz der Vorderfläche gegenüber dem Körperumriss
 
 # ---------------------------------------------------------------- Bohrungen (x, z, r)
 DURCHGANG = {
@@ -132,7 +132,10 @@ def unify(solid):
 
 
 def build():
-    plate = slab(K.FRONT, Y_FRONT, Y_STEP) + slab(K.BODY, Y_STEP - 0.01, Y_NOTCH) + slab(K.BACK, Y_NOTCH - 0.01, Y_BACK)
+    body_face = contour_face(K.BODY, Y_FRONT)
+    front_face = Face(body_face.outer_wire().offset_2d(-FRONT_INSET, kind=Kind.ARC))
+    plate = extrude(front_face, amount=Y_STEP - Y_FRONT, dir=(0, 1, 0))
+    plate += slab(K.BODY, Y_STEP - 0.01, Y_NOTCH) + slab(K.BACK, Y_NOTCH - 0.01, Y_BACK)
     for pad in K.PADS:
         xs = [s[1] for s in pad]
         zs = [s[2] for s in pad]
