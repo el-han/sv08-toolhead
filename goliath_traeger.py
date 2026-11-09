@@ -30,7 +30,7 @@ GOLIATH_ROT = 135.0                   # Heizpatrone zeigt nach +X
 GOLIATH_TOP = 43.50
 GOLIATH_TIP = -25.75
 GOL_SCREW_R = 8.0
-GOL_SCREWS_DEG = [0, 90, 270]
+GOL_SCREWS_DEG = [45, 135, 225, 315]
 SCREW_D, HEAD_D, HEAD_DEPTH = 2.9, 5.0, 2.6     # M2,5 DIN 912
 
 # Rechteckige Platte, hinten direkt mit der Hinterwand (Hauptkörper) verbunden
