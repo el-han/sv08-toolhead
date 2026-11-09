@@ -44,6 +44,10 @@ def to_sv(x, y, z):
 MOTOR_AX = to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[0::2]   # (x, z)
 MOTOR_FACE_Y = Y0 - MOTOR_FACE_SH
 
+# Motor um die eigene Achse gedreht, von vorne gesehen im Uhrzeigersinn (Ritzel bleibt koaxial)
+MOTOR_ROT = 36.0
+MOTOR_TURN = Pos(MOTOR_AX[0], 0, MOTOR_AX[1]) * Rot(0, MOTOR_ROT, 0) * Pos(-MOTOR_AX[0], 0, -MOTOR_AX[1])
+
 # Teile über Volumen identifiziert (Labels im STEP sind teils doppelt)
 _NAMES = {
     5622: "housing_core", 821: "housing_front", 952: "housing_front_k", 2517: "housing_rear",
@@ -88,6 +92,8 @@ def _load():
                 name = "antriebswelle" if vol > 300 else "idler_welle"
         flip = FLIP if name in FLIPPED else Location()
         group = [T * flip * s for s in group]
+        if name == "motor":
+            group = [MOTOR_TURN * s for s in group]
         shape = group[0] if k == 1 else Compound(group)
         parts.append((name, shape))
     return parts

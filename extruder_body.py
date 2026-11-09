@@ -20,6 +20,7 @@ CLR = 0.4
 MX, MZ = sh.MOTOR_AX
 MOTOR_R = 18.25 + CLR
 EAR_DX = 21.95                 # Abstand Laschenbogen-Mitte zur Motorachse (x)
+SCREW_DX, SCREW_R = 21.92, 1.7   # Lochabstand der Motorlaschen, M3-Durchgang
 EAR_R = 3.5 + CLR              # Radius der Laschenbögen am Motorhalter
 Z_TOP = -101.5                 # Oberkante der Verlängerung (Motor oben bei -104.22)
 Z_EXT_BOT = -146.035          # Unterkante der Verlängerung (gerade Seitenkanten der Platte)
@@ -44,7 +45,16 @@ def hull_face(y):
         Edge.make_three_point_arc(pt(-EAR_DX, EAR_R, math.pi + t), pt(-EAR_DX, EAR_R, -math.pi / 2), pt(-EAR_DX, EAR_R, -t)),
         Edge.make_line(pt(-EAR_DX, EAR_R, -t), pt(0, MOTOR_R, -t)),
     ]
-    return Face(Wire(edges))
+    return sh.MOTOR_TURN * Face(Wire(edges))
+
+
+def motor_screw_holes():
+    """Durchgangslöcher für die beiden Motorschrauben (M3, durch die Platte von vorne)."""
+    out = []
+    for dx in (-SCREW_DX, SCREW_DX):
+        p = (sh.MOTOR_TURN * Pos(MX + dx, 0, MZ)).position
+        out.append(ip.y_hole(p.X, p.Z, SCREW_R, ip.Y_PAD - 1, sh.MOTOR_FACE_Y + 0.1))
+    return out
 
 
 
@@ -63,6 +73,8 @@ def build():
         body -= ip.y_hole(x, z, r, ip.Y_PAD - 1, ip.Y_BACK + 1)
     # Motorvertiefung: konvexe Hülle aus Motorkörper und Laschenbögen, ab Motor-Anlagefläche nach hinten
     body -= extrude(hull_face(sh.MOTOR_FACE_Y), amount=ip.Y_BACK + 1 - sh.MOTOR_FACE_Y, dir=(0, 1, 0))
+    for h in motor_screw_holes():
+        body -= h
     # Ritzel + Zentrierbund des Motors vor der Anlagefläche
     body -= Pos(MX, sh.MOTOR_FACE_Y, MZ) * Rot(90, 0, 0) * Cylinder(8.0 + CLR, 8.0, align=MIN)
     # 50er-Zahnrad und hinteres Lager auf der Antriebswelle (ragen seit dem Umdrehen in die Platte)
