@@ -1,40 +1,77 @@
 """
-Neue extruder_install_plate (JXHSV08-06008) für den Sherpa-Umbau, vereinfacht.
+Neue extruder_install_plate für den Sherpa-Umbau – Nachbau in build123d.
 
-Aufbau:
-  1. Vorderteil = Originalplatte bis zur durchgehenden Haut (y <= Y_SKIN).
-     Bohrungen und Konturen der Vorderseite bleiben original, darunter die
-     drei M3-Bohrungen zum Schlitten.
-  2. Rückseite = Querschnitt der Haut bei Y_SKIN (Umriss + Durchgangsbohrungen),
-     massiv bis zur Rückseite extrudiert. Die Spritzguss-Rippen entfallen damit
-     komplett, die ganze Rückseite ist eine Fläche.
-  3. Funktionstaschen: nur die Nachbarteile, die tatsächlich in die Rückseite
-     ragen (Sliding Panel, Senkkopfschrauben MGN-Wagen, ...), werden mit Luft
-     CLR abgezogen, dazu die Rinne in Tasche 17.
+Die Platte wird aus gemessenen Umrissen (install_plate_konturen.py, erzeugt
+von tools/konturen_messen.py) und benannten Bohrungen neu aufgebaut. Vom
+Original-STEP werden nur Koordinaten übernommen, keine Geometrie.
+
+Schichten (y, von vorne nach hinten):
+  Auflagen      Y_PAD   .. Y_FRONT   5 kleine Auflagen auf der Vorderseite
+  Vorderfläche  Y_FRONT .. Y_STEP    rundum etwas schmaler (Absatz)
+  Körper        Y_STEP  .. Y_NOTCH   voller Umriss
+  Rückseite     Y_NOTCH .. Y_BACK    seitliche Aussparungen für das Sliding Panel
+
+Bewusst weggelassen gegenüber dem Original: Spritzguss-Rippen und -Schrägen,
+Sitz und Bohrungen des alten Motors, Zahnrad-Aussparung, Oval-Ansatz.
+Funktionstaschen für Schrauben, die in die Rückseite ragen, werden aus den
+Nachbarteilen bestimmt (glatte Stufenzylinder mit Luft CLR).
 """
-from build123d import Align, Box, Compound, Cylinder, Face, GeomType, Pos, Rot, Solid, extrude, export_step, export_stl
+from build123d import (Align, Box, Compound, Cylinder, Edge, Face, Pos, Rot, Solid, Vector, Wire,
+                       export_step, extrude)
 
 import basis as b
+import install_plate_konturen as K
 
-Y_SKIN = 245.0
+MIN = (Align.CENTER, Align.CENTER, Align.MIN)
 CLR = 0.4
 BIG = 400
 
-orig = b.find("xtruder_install_plate")[0]
-ob = orig.bounding_box()
-Y_BACK = ob.max.Y
-# Bohrungen des alten Motors (Mitte und Laschen) -> zu
-OLD_MOTOR_HOLES = [(-342.0, -143.7), (-322.65, -133.35), (-361.35, -153.95)]
-# Oval-Ansatz vorne (steht von y 240.05 bis zur Plattenfläche 242.3 vor) und seine Bohrungen
-Y_FRONT = 242.2747          # Vorderfläche der Platte (Original)
-OVAL_C, OVAL_BOX = (-336.0, (239.0 + Y_FRONT) / 2, -190.7), (17.0, Y_FRONT - 239.0, 7.5)
-OVAL_HOLES = [(-340.7, -190.65), (-331.15, -190.65)]
-RINNE = Pos(-321.0, 249.0, -187.67) * Box(10, 12, 3.10)    # Tasche 17, Mitte bleibt offen
+# ---------------------------------------------------------------- Schichten (y)
+Y_PAD = 240.2747
+Y_FRONT = 242.2747
+Y_STEP = 242.8747
+Y_NOTCH = 245.0
+Y_BACK = 250.7747
+Y_FRONT_ORIG = Y_FRONT       # für andere Module
+
+# ---------------------------------------------------------------- Bohrungen (x, z, r)
+DURCHGANG = {
+    "schlitten_1": (-361.525, -201.175, 1.75),     # M3 zum Schlitten
+    "schlitten_2": (-315.825, -194.675, 1.75),
+    "schlitten_3": (-310.825, -158.675, 1.75),
+    "sensor": (-352.525, -215.975, 1.40),          # Sensorhalter
+    "luftfuehrung": (-352.525, -199.975, 2.00),    # hintere Luftführung
+    "schiene_links": (-341.525, -202.175, 2.00),   # M3 von hinten (Sliding Panel)
+    "schiene_rechts": (-325.525, -202.175, 2.00),
+}
+MAGNETE = {                                        # Ø4 durchgehend (im Original Hohlraum hinter der Haut)
+    "magnet_ol": (-364.775, -140.675, 2.0), "magnet_or": (-308.275, -140.675, 2.0),
+    "magnet_ul": (-364.275, -194.428, 2.0), "magnet_ur": (-308.775, -194.428, 2.0),
+}
+RINNE = Pos(-321.0, (Y_NOTCH + 255.0) / 2, -187.67) * Box(10, 255.0 - Y_NOTCH, 3.10)   # Querrinne hinten (ehem. Tasche 17)
+OVAL_PADS = (-340.8, -331.0, -194.0, -187.5)               # Auflagen im Oval-Bereich entfallen
 
 
-def _solid(shape):
-    s = shape.solids()
-    return s[0] if len(s) == 1 else max(s, key=lambda x: x.volume)
+# ---------------------------------------------------------------- Hilfen
+def contour_face(segs, y):
+    edges = []
+    for s in segs:
+        if s[0] == "L":
+            a, c = Vector(s[1], y, s[2]), Vector(s[3], y, s[4])
+            if (a - c).length > 1e-4:
+                edges.append(Edge.make_line(a, c))
+        else:
+            edges.append(Edge.make_three_point_arc(Vector(s[1], y, s[2]), Vector(s[3], y, s[4]),
+                                                   Vector(s[5], y, s[6])))
+    return Face(Wire(edges))
+
+
+def slab(segs, y0, y1):
+    return extrude(contour_face(segs, y0), amount=y1 - y0, dir=(0, 1, 0))
+
+
+def y_hole(x, z, r, y0, y1):
+    return Pos(x, y0, z) * Rot(-90, 0, 0) * Cylinder(r, y1 - y0, align=MIN)
 
 
 def stepped_cylinder(part, clr, step=0.5):
@@ -93,69 +130,55 @@ def unify(solid):
     return solid
 
 
+
 def build():
-    front_box = Pos(ob.center().X, (ob.min.Y - 1 + Y_SKIN) / 2, ob.center().Z) * Box(BIG, Y_SKIN - ob.min.Y + 1, BIG)
-    front = _solid(Compound(list(orig.intersect(front_box))))
+    plate = slab(K.FRONT, Y_FRONT, Y_STEP) + slab(K.BODY, Y_STEP - 0.01, Y_NOTCH) + slab(K.BACK, Y_NOTCH - 0.01, Y_BACK)
+    for pad in K.PADS:
+        xs = [s[1] for s in pad]
+        zs = [s[2] for s in pad]
+        cx, cz = sum(xs) / len(xs), sum(zs) / len(zs)
+        if OVAL_PADS[0] < cx < OVAL_PADS[1] and OVAL_PADS[2] < cz < OVAL_PADS[3]:
+            continue
+        if len(pad) < 3:
+            continue
+        plate += slab(pad, Y_PAD, Y_FRONT + 0.01)
 
-    # Querschnitt der Haut -> massive Rückseite
-    sliver = Compound(list(orig.intersect(Pos(ob.center().X, Y_SKIN - 0.01, ob.center().Z) * Box(BIG, 0.02, BIG))))
-    faces = [f for f in sliver.faces() if f.normal_at().Y > 0.99]
-    back = None
-    holes = []
-    for f in faces:
-        outer = Face(f.outer_wire())
-        e = extrude(outer, amount=Y_BACK - f.center().Y, dir=(0, 1, 0))
-        back = e if back is None else back + e
-        for w in f.inner_wires():
-            ed = w.edges()
-            if len(ed) == 1 and ed[0].geom_type == GeomType.CIRCLE:
-                c = ed[0].arc_center
-                if not any(abs(c.X - x) < 1.0 and abs(c.Z - z) < 1.0 for x, z in OLD_MOTOR_HOLES):
-                    holes.append((c.X, c.Z, ed[0].radius))
-    for x, z, r in holes:
-        back = back - Pos(x, Y_SKIN - 1, z) * Rot(-90, 0, 0) * Cylinder(r, Y_BACK - Y_SKIN + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    print(f"Durchgangsbohrungen hinten: {len(holes)}")
+    for x, z, r in DURCHGANG.values():
+        plate -= y_hole(x, z, r, Y_PAD - 1, Y_BACK + 1)
+    for x, z, r in MAGNETE.values():
+        plate -= y_hole(x, z, r, Y_PAD - 1, Y_BACK + 1)
 
-    # Funktionstaschen: Nachbarteile, die in die Rückseite ragen
-    bb = back.bounding_box()
-    cutters = []
+    # Funktionstaschen: Schrauben der Nachbarteile, die in die Platte ragen
+    pb = plate.bounding_box()
+    names = set()
     for label, p in b.sv08_parts():
-        if "xtruder_install_plate" in label or any(k in label for k in b.REMOVED_SHERPA + ["36_step_motor"]):
+        if "screw" not in label or any(k in label for k in b.REMOVED_SHERPA):
             continue
-        pb = p.bounding_box()
-        if (pb.max.Y < bb.min.Y or pb.min.Y > bb.max.Y or pb.max.X < bb.min.X or pb.min.X > bb.max.X
-                or pb.max.Z < bb.min.Z or pb.min.Z > bb.max.Z):
+        q = p.bounding_box()
+        if (q.max.Y < pb.min.Y or q.min.Y > pb.max.Y or q.max.X < pb.min.X or q.min.X > pb.max.X
+                or q.max.Z < pb.min.Z or q.min.Z > pb.max.Z):
             continue
-        def _ov(s):
-            r = s & back
-            return sum(x.volume for x in r.solids()) if r else 0.0
-        if any(_ov(s) > 0.01 for s in p.solids()):
-            cutters.append((b.short(label), p))
-    for name, p in cutters:
-        back = back - stepped_cylinder(p, CLR)
-    back = back - RINNE
-    print("Funktionstaschen aus:", ", ".join(sorted({n for n, _ in cutters})))
-
-    plate = front + back
-
-    # Vorderseite vereinfachen:
-    # (a) zahnradförmige Aussparung des alten Motorsitzes füllen
-    plate = plate + Pos(-342.0, Y_FRONT, -143.7) * Rot(-90, 0, 0) * Cylinder(
-        16.6, Y_SKIN + 0.2 - Y_FRONT, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    # (b) Oval-Ansatz mit zwei Bohrungen entfernen und Bohrungen/Schlitze füllen
-    plate = plate - Pos(*OVAL_C) * Box(*OVAL_BOX)
-    for x, z in OVAL_HOLES:
-        plate = plate + Pos(x, Y_FRONT, z) * Rot(-90, 0, 0) * Cylinder(2.0, Y_BACK - Y_FRONT, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    plate = plate + Pos(-336.0, (Y_FRONT + Y_BACK) / 2, -190.7) * Box(4.8, Y_BACK - Y_FRONT, 1.8)
-    plate = _solid(plate.clean())
-    return unify(plate)
+        hit = any((s & plate) and sum(x.volume for x in (s & plate).solids()) > 0.01 for s in p.solids())
+        if hit and not _old_motor_screw(p):
+            plate -= stepped_cylinder(p, CLR)
+            names.add(b.short(label))
+    plate -= RINNE
+    print("Funktionstaschen für:", ", ".join(sorted(names)))
+    s = plate.clean().solids()
+    return max(s, key=lambda x: x.volume)
 
 
+def _old_motor_screw(p):
+    c = p.bounding_box().center()
+    return any(abs(c.X - x) < 1.5 and abs(c.Z - z) < 1.5 for x, z in ((-322.65, -133.35), (-361.35, -153.95)))
+
+
+orig = b.find("xtruder_install_plate")[0]     # nur für Vergleiche (check.py)
+ob = orig.bounding_box()
 plate = build()
 
 if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)
     plate.label = "install_plate_sherpa"
     export_step(plate, str(b.OUT / "install_plate_sherpa.step"))
-    print(f"Volumen {plate.volume:.0f} mm^3 (orig {orig.volume:.0f}), Flächen {len(plate.faces())} "
-          f"(orig {len(orig.faces())}), gültig {plate.is_valid}")
+    print(f"Volumen {plate.volume:.0f} mm^3, Flächen {len(plate.faces())}, gültig {plate.is_valid}")

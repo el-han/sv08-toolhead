@@ -233,11 +233,9 @@ if __name__ == "__main__":
         print("Keine Kollisionen." if not bad else "Siehe Kollisionen oben.")
 
     if "--render" in sys.argv:
-        from build123d import export_stl
         for fname, obj in (("extruder_body_sherpa", eb.body), ("goliath_traeger", gtr.traeger)):
             obj.label = fname
             export_step(obj, str(b.OUT / f"{fname}.step"))
-            export_stl(obj, str(b.OUT / f"{fname}.stl"), tolerance=0.01, angular_tolerance=0.1)
         ctx = [(p, "#b0b0b0", 0.30) for n, t, p in sv if -260 < p.bounding_box().center().Z < -90
                and p.bounding_box().size.Y < 120]
         ctx += [(p, "#c060c0", 0.8) for n, t, p in sp]

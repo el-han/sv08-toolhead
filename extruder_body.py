@@ -5,7 +5,7 @@ Das Sherpa-Originalgehäuse ist entfernt, ein neues Gehäuse folgt. Bis dahin
 besteht der Hauptkörper aus der vereinfachten Install-Plate (install_plate.py)
 mit dem Durchbruch für den Motor (LDO 36STH17), dessen Lage aus sherpa.py kommt.
 """
-from build123d import Align, Cylinder, Pos, Rot, export_step, export_stl
+from build123d import Align, Cylinder, Pos, Rot, export_step
 
 import basis as b
 import sherpa as sh
@@ -44,5 +44,4 @@ if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)
     body.label = "extruder_body_sherpa"
     export_step(body, str(b.OUT / "extruder_body_sherpa.step"))
-    export_stl(body, str(b.OUT / "extruder_body_sherpa.stl"), tolerance=0.01, angular_tolerance=0.1)
     print(f"Volumen {body.volume:.0f} mm^3, Flächen {len(body.faces())}")

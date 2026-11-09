@@ -10,7 +10,7 @@ Koordinaten = Sovol-STEP-Baugruppe (mm). Düse liegt auf Originalposition.
 """
 import math
 
-from build123d import Align, Box, Cylinder, Pos, Rot, export_step, export_stl, import_step
+from build123d import Align, Box, Cylinder, Pos, Rot, export_step, import_step
 
 import basis as b
 import sherpa as sh
@@ -110,6 +110,5 @@ if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)
     traeger.label = "goliath_traeger"
     export_step(traeger, str(b.OUT / "goliath_traeger.step"))
-    export_stl(traeger, str(b.OUT / "goliath_traeger.stl"), tolerance=0.01, angular_tolerance=0.1)
     print(f"Düsenspitze z={nozzle_z:.2f} (Original {b.ORIG_NOZZLE_Z})")
     print(f"Volumen Träger: {traeger.volume:.0f} mm^3, bbox {traeger.bounding_box().size}")
