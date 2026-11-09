@@ -4,13 +4,13 @@ Goliath-Träger für den Sherpa-Umbau des Sovol SV08.
 Rechteckige Platte, die hinten direkt in die Hinterwand übergeht (wird in
 extruder_body.py mit dem Hauptkörper verschmolzen). Das Goliath (luftgekühlt)
 wird von oben mit 3x M2,5 angeschraubt (Köpfe versenkt).
-Dazu: Ohr für den 2515-Hotendlüfter. Der 5020-Lüfter ist hier nicht mehr befestigt.
+Dazu: Ohr für den 2515-Hotendlüfter (auf der -X-Seite). Der 5020-Lüfter ist hier nicht mehr befestigt.
 
 Koordinaten = Sovol-STEP-Baugruppe (mm). Düse liegt auf Originalposition.
 """
 import math
 
-from build123d import Align, Box, Cylinder, Pos, Rot, export_step, import_step
+from build123d import Align, Box, Cylinder, Plane, Pos, Rot, export_step, import_step
 
 import basis as b
 import sherpa as sh
@@ -39,8 +39,10 @@ Y_FRONT = 214.2                       # knapp hinter dem Platinenträger (y=214)
 PCB_SCREW, PCB_SCREW_R = (-336.5, -153.2), 2.0
 Y_WALL = 242.8747                     # install_plate.Y_STEP (reicht bis in die Wand)
 
-# 2515-Hotendlüfter (Original-Lüfter, an +X-Seite)
-FAN_FACE_X = -324.30
+# 2515-Hotendlüfter: Maße wie an der Original-(+X-)Seite, Lüfter und Ohr werden dann an der
+# Filamentachse (x=AX_X) auf die -X-Seite gespiegelt
+FAN_MIRROR = Plane.YZ.offset(AX_X)
+FAN_FACE_X = -323.80                  # gespiegelt: Lüfterfläche bei x=-347.6
 FAN_SHIFT_X = FAN_FACE_X - (-328.70)
 FAN_DZ = 12.0                         # Lüfter mittig vor den Kühlkörper (über dem Heizblock)
 FAN_HOLES = [(217.55, -167.57 + FAN_DZ), (237.55, -167.57 + FAN_DZ)]   # (y, z) Lochlage am Lüfter
@@ -54,12 +56,13 @@ FAN5020_SHIFT = (0.0, -2.0, 0.0)
 # ---------------------------------------------------------------- Träger
 def build():
     plate = Pos(AX_X, (Y_FRONT + Y_WALL) / 2, Z_BOT) * Box(2 * HALF_X, Y_WALL - Y_FRONT, T, align=MIN)
-    # Ohr für 2515 (reicht bis unter die Lüfterbohrungen)
+    # Ohr für 2515 (reicht bis unter die Lüfterbohrungen), auf der +X-Seite konstruiert und gespiegelt
     ear_top = Z_TOP
     ear_bot = FAN_HOLES[0][1] - 4.0
-    plate += Pos(sum(EAR_X) / 2, sum(EAR_Y) / 2, ear_bot) * Box(
+    ear = Pos(sum(EAR_X) / 2, sum(EAR_Y) / 2, ear_bot) * Box(
         EAR_X[1] - EAR_X[0], EAR_Y[1] - EAR_Y[0], ear_top - ear_bot, align=MIN)
-    plate += Pos(-331.0, sum(EAR_Y) / 2, Z_BOT) * Box(6.0, EAR_Y[1] - EAR_Y[0], T, align=MIN)
+    ear += Pos(-331.0, sum(EAR_Y) / 2, Z_BOT) * Box(6.0, EAR_Y[1] - EAR_Y[0], T, align=MIN)
+    plate += ear.mirror(FAN_MIRROR)
 
     # Filamentkanal + Zentrierung
     plate -= Pos(AX_X, AX_Y, Z_BOT - 1) * Cylinder(PTFE_D / 2, T + 2, align=MIN)
@@ -70,14 +73,15 @@ def build():
         y = AX_Y + GOL_SCREW_R * math.sin(math.radians(deg))
         plate -= Pos(x, y, Z_BOT - 1) * Cylinder(SCREW_D / 2, T + 2, align=MIN)
         plate -= Pos(x, y, Z_TOP - HEAD_DEPTH) * Cylinder(HEAD_D / 2, 10, align=MIN)
-    # 2515-Gewindelöcher (von +X)
+    # 2515-Gewindelöcher (von außen, gespiegelt)
     for y, z in FAN_HOLES:
-        plate -= Pos(FAN_FACE_X + 0.1, y, z) * Rot(0, -90, 0) * Cylinder(
-            FAN_HOLE_D / 2, FAN_HOLE_DEPTH + 0.1, align=MIN)
+        plate -= (Pos(FAN_FACE_X + 0.1, y, z) * Rot(0, -90, 0) * Cylinder(
+            FAN_HOLE_D / 2, FAN_HOLE_DEPTH + 0.1, align=MIN)).mirror(FAN_MIRROR)
     # Untere Platinen-Passschraube ragt von vorne in die Platte (später Gewindeeinsatz)
     plate -= Pos(PCB_SCREW[0], Y_FRONT - 1, PCB_SCREW[1]) * Rot(-90, 0, 0) * Cylinder(PCB_SCREW_R, 6.0, align=MIN)
     # Freiraum zum 2515-Lüfter (liegt mit Oberkante knapp unter dem Träger)
-    plate -= Pos(FAN_FACE_X, sum(EAR_Y) / 2, Z_BOT - 20) * Box(30, 40, 20 + T + 1, align=(Align.MIN, Align.CENTER, Align.MIN))
+    plate -= (Pos(FAN_FACE_X, sum(EAR_Y) / 2, Z_BOT - 20) * Box(30, 40, 20 + T + 1, align=(Align.MIN, Align.CENTER, Align.MIN))
+              ).mirror(FAN_MIRROR)
     # Freiraum für den Goliath selbst (Kühlkörper-Oberseite liegt plan an)
     return plate
 

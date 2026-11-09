@@ -11,7 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from build123d import Compound, Location, Pos, export_step
+from build123d import Box, Compound, Location, Pos, export_step
 
 import basis as b
 import sherpa as sh
@@ -52,10 +52,15 @@ def sv08_placed():
             continue
         if removed_screw(label, p):
             continue
+        if "proximity_switch" in label:                    # Kabel der Eddy-Sonde entfernen
+            p = p - Pos(-352.5, 239.8, -182.5) * Box(3.4, 3.4, 15.9)
         if any(k in label for k in FRONT5020):
             p, tag = Pos(*gtr.FAN5020_SHIFT) * p, "5020 vor"
         elif FAN2515 in label:
-            p, tag = Pos(gtr.FAN_SHIFT_X, 0, gtr.FAN_DZ) * p, "2515 verschoben"
+            # Kabel (4 dünne Litzen nach oben) entfernen, verschieben und auf die -X-Seite spiegeln
+            p = Compound([p.solids()[0], p.solids()[1] - Pos(-323.65, 234.75, -155.0) * Box(1.2, 1.6, 20.2)])
+            p = (Pos(gtr.FAN_SHIFT_X, 0, gtr.FAN_DZ) * p).mirror(gtr.FAN_MIRROR)
+            tag = "2515 gespiegelt"
         else:
             tag = "original"
         out.append((label, tag, p))
@@ -107,7 +112,7 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
 
 
 # ---------------------------------------------------------------- Baum für check_assembly.step
-NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Goliath_Traeger": (0.15, 0.40, 0.85)}
+NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Deckel": (0.20, 0.55, 0.80), "Goliath_Traeger": (0.15, 0.40, 0.85)}
 SHERPA_COLORS = [("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
                  ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
                  ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
@@ -177,7 +182,8 @@ def assembly_tree(eb, gtr, sv, sp):
             out.append(_named(p, n if seen[n] == 1 else f"{n}_{seen[n]}", c))
         return out
 
-    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"])])
+    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
+                              _named(gh.deckel, "Deckel", NEW_COLORS["Deckel"])])
     gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
@@ -189,12 +195,13 @@ def assembly_tree(eb, gtr, sv, sp):
 
 if __name__ == "__main__":
     import extruder_body as eb
+    import gehaeuse as gh
     import goliath_traeger as gtr
     import install_plate as ip
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Goliath", gtr.gol)]
+    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Goliath", gtr.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False
@@ -233,7 +240,7 @@ if __name__ == "__main__":
         print("Keine Kollisionen." if not bad else "Siehe Kollisionen oben.")
 
     if "--render" in sys.argv:
-        for fname, obj in (("extruder_body_sherpa", eb.body),):
+        for fname, obj in (("extruder_body_sherpa", eb.body), ("deckel", gh.deckel)):
             obj.label = fname
             export_step(obj, str(b.OUT / f"{fname}.step"))
         ctx = [(p, "#b0b0b0", 0.30) for n, t, p in sv if -260 < p.bounding_box().center().Z < -90
