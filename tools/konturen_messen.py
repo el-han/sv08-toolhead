@@ -38,8 +38,7 @@ def largest(y):
 
 
 LAYERS = {
-    "BODY": 244.0,    # Plattenkörper, voller Umriss
-    "BACK": 245.0,    # ab Hautmitte nach hinten: seitliche Aussparungen für das Sliding Panel
+    "BODY": 245.0,    # Plattenkörper (ohne die vier Führungsnasen, die install_plate.py ergänzt)
 }
 lines = ['"""Gemessene Umrisse der Original-Install-Plate (x, z), erzeugt von tools/konturen_messen.py.',
          'Segmente: ("L", x0, z0, x1, z1) Gerade, ("A", x0, z0, xm, zm, x1, z1) Bogen über drei Punkte."""', ""]
