@@ -22,7 +22,8 @@ FAN2515 = "2515_pipe_cooling_fan"
 
 # Entfallene SV08-Schrauben, über Lage identifiziert (x, z, Achse):
 #   alte Motorschrauben (Y) und M3x12 der alten Kabelklemme (X, ragen seitlich in den Sherpa)
-REMOVED_SCREWS = [(-322.65, -133.35, "Y"), (-361.35, -153.95, "Y"), (-347.2, -129.65, "X")]
+REMOVED_SCREWS = [(-322.65, -133.35, "Y"), (-361.35, -153.95, "Y"), (-347.2, -129.65, "X"),
+                  (-360.85, -166.95, "Y")]   # M2,5 des 5020 (Lüfter nicht mehr am Träger befestigt)
 
 
 def removed_screw(label, p):
@@ -176,8 +177,7 @@ def assembly_tree(eb, gtr, sv, sp):
             out.append(_named(p, n if seen[n] == 1 else f"{n}_{seen[n]}", c))
         return out
 
-    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
-                              _named(gtr.traeger, "Goliath_Traeger", NEW_COLORS["Goliath_Traeger"])])
+    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"])])
     gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
@@ -194,7 +194,7 @@ if __name__ == "__main__":
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Träger", gtr.traeger), ("Goliath", gtr.gol)]
+    new = [("Hauptkörper", eb.body), ("Goliath", gtr.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False
@@ -233,13 +233,13 @@ if __name__ == "__main__":
         print("Keine Kollisionen." if not bad else "Siehe Kollisionen oben.")
 
     if "--render" in sys.argv:
-        for fname, obj in (("extruder_body_sherpa", eb.body), ("goliath_traeger", gtr.traeger)):
+        for fname, obj in (("extruder_body_sherpa", eb.body),):
             obj.label = fname
             export_step(obj, str(b.OUT / f"{fname}.step"))
         ctx = [(p, "#b0b0b0", 0.30) for n, t, p in sv if -260 < p.bounding_box().center().Z < -90
                and p.bounding_box().size.Y < 120]
         ctx += [(p, "#c060c0", 0.8) for n, t, p in sp]
-        items = ctx + [(gtr.gol, "#d08030", 1.0), (gtr.traeger, "#2060d0", 1.0), (eb.body, "#20a060", 0.9)]
+        items = ctx + [(gtr.gol, "#d08030", 1.0), (eb.body, "#20a060", 0.9)]
         if "--png" in sys.argv:
           render(items, str(b.OUT / "ansicht_baugruppe.png"),
                [(10, -90, "vorne"), (10, 0, "rechts (+X)"), (25, -130, "iso")])

@@ -11,6 +11,7 @@ from build123d import (Align, Box, Cylinder, Edge, Face, Pos, Rot, Vector, Wire,
                        export_step)
 
 import basis as b
+import goliath_traeger as gtr
 import sherpa as sh
 import install_plate as ip
 
@@ -58,6 +59,8 @@ def build():
     pts = [(-367.548, Z_EXT_BOT)] + top + [(-305.501, Z_EXT_BOT)]
     segs = [("L", *a, *c) for a, c in zip(pts, pts[1:] + pts[:1])]
     body += ip.slab(segs, ip.Y_STEP, ip.Y_BACK)
+    for x, z, r in ip.MAGNETE.values():           # Magnetbohrungen durch die Verlängerung erhalten
+        body -= ip.y_hole(x, z, r, ip.Y_PAD - 1, ip.Y_BACK + 1)
     # Motorvertiefung: konvexe Hülle aus Motorkörper und Laschenbögen, ab Motor-Anlagefläche nach hinten
     body -= extrude(hull_face(sh.MOTOR_FACE_Y), amount=ip.Y_BACK + 1 - sh.MOTOR_FACE_Y, dir=(0, 1, 0))
     # Ritzel + Zentrierbund des Motors vor der Anlagefläche
@@ -70,6 +73,8 @@ def build():
                 r = max(pb.size.X, pb.size.Z) / 2 + CLR + 0.2
                 body -= Pos(pb.center().X, pb.min.Y - CLR, pb.center().Z) * Rot(-90, 0, 0) * Cylinder(
                     r, pb.size.Y + 2 * CLR, align=MIN)
+    # Goliath-Träger ist direkt mit der Hinterwand verbunden
+    body += gtr.traeger
     return max(body.clean().solids(), key=lambda s: s.volume)
 
 
