@@ -124,8 +124,7 @@ def build():
     body = block()
     # Goliath-Träger ist direkt mit der Hinterwand verbunden
     body += gtr.traeger
-    # Hintere Idler-Stiftaufnahme; Freiräume für 50er-Zahnrad, Ritzel, hinteres Lager und Idler
-    body += gh.scharnier()
+    # Freiräume für 50er-Zahnrad, Ritzel, hinteres Lager und Idler
     for c in gh.freiraum():
         if c.bounding_box().max.Y > gh.Y_LID_BACK:
             body -= c

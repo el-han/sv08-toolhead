@@ -37,7 +37,8 @@ FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 
 INSERT_D, INSERT_L = 4.0, 5.5
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
-LID_PADS = [(*SHAFT, 4.1 + 2.0), (*PIN, 1.65 + 2.0), (-330.2, -128.7, INSERT_D / 2 + 2.0)]   # 2 mm Wand
+WALL = 1.5                          # Wandstärke der Zylinder
+LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7, INSERT_D / 2 + WALL)]
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 PCB_RECT = (-364.5, -308.5, -161.2, -126.2)   # Umriss der Platinen (x0, x1, z0, z1)
 # Motorplatte
@@ -46,7 +47,7 @@ MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5   # Lochabstand der Motorlaschen, Laschen
 MOTOR_BOSS_R = 8.0 + CLR                 # Ritzel + Zentrierbund
 SLOT_HALF = 1.5                          # halbe Langlochlänge (Mittenabstand ±1.5 mm)
 # Hintere Stiftaufnahme auf dem Hauptkörper
-PIN_BOSS_R, PIN_BOSS_Y0 = 1.65 + 1.0, 235.35   # 1 mm Wandstärke
+PIN_BOSS_R, PIN_BOSS_Y0 = 1.65 + WALL, 235.35
 PCB_INSERTS = [(-330.2, -128.7)]    # Platinen-Passschraube im Deckel (die untere sitzt im Träger)
 
 
@@ -100,12 +101,9 @@ def freiraum():
 
 
 def scharnier():
-    """Hintere Idler-Stiftaufnahme: Zylinder auf dem Hauptkörper (Achse in Y) mit Steg zum Träger."""
+    """Hintere Idler-Stiftaufnahme: Zylinder (Achse in Y) vorne an der Motorplatte."""
     px, pz = PIN
-    c = ycyl(px, pz, PIN_BOSS_R, PIN_BOSS_Y0, Y_FRAME_BACK)
-    c += Pos(px, (PIN_BOSS_Y0 + Y_FRAME_BACK) / 2, (pz + Z_BOT) / 2) * Box(
-        2 * PIN_BOSS_R, Y_FRAME_BACK - PIN_BOSS_Y0, pz - Z_BOT)
-    return c
+    return ycyl(px, pz, PIN_BOSS_R, PIN_BOSS_Y0, sh.MOTOR_FACE_Y - MOTOR_PLATE_T + 0.01)
 
 
 def build_deckel():
@@ -135,7 +133,11 @@ def motorplatte():
     x0, x1 = mx - MOTOR_EAR_DX - MOTOR_EAR_R, mx + MOTOR_EAR_DX + MOTOR_EAR_R
     z1 = sh.get("motor")[0].bounding_box().max.Z
     p = Pos((x0 + x1) / 2, (y0 + y1) / 2, (Z_BOT + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - Z_BOT)
-    p -= ycyl(mx, mz, MOTOR_BOSS_R, y0 - 1, y1 + 1)
+    # Durchgang Ritzel/Zentrierbund als Langloch: Schwenken um die rechte Schraube verschiebt die Achse
+    # um SLOT_HALF * (Abstand Achse-Drehpunkt) / (Abstand der Schrauben) = SLOT_HALF / 2 senkrecht
+    dz = SLOT_HALF / 2
+    p -= ycyl(mx, mz - dz, MOTOR_BOSS_R, y0 - 1, y1 + 1) + ycyl(mx, mz + dz, MOTOR_BOSS_R, y0 - 1, y1 + 1)
+    p -= Pos(mx, (y0 + y1) / 2, mz) * Box(2 * MOTOR_BOSS_R, MOTOR_PLATE_T + 2, 2 * dz)
     p -= ycyl(mx + MOTOR_EAR_DX, mz, 1.7, y0 - 1, y1 + 1)
     xl = mx - MOTOR_EAR_DX                              # Langloch, vertikal
     p -= ycyl(xl, mz - SLOT_HALF, 1.7, y0 - 1, y1 + 1) + ycyl(xl, mz + SLOT_HALF, 1.7, y0 - 1, y1 + 1)
@@ -153,9 +155,9 @@ deckel = build_deckel()
 
 
 def build_motorplatte():
-    """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz."""
-    p = motorplatte()
-    y0 = sh.MOTOR_FACE_Y - MOTOR_PLATE_T
+    """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz und Idler-Stiftaufnahme."""
+    p = motorplatte() + scharnier()
+    y0 = PIN_BOSS_Y0
     for c in freiraum():
         cb = c.bounding_box()
         if cb.max.Y > y0 and cb.min.Y < sh.MOTOR_FACE_Y:
