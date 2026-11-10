@@ -36,11 +36,11 @@ IDLER_SWING = (-2.0, 0.0, 6.0, 12.0)  # Schwenkwinkel des Idlers (Grad, von der 
 FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 
 INSERT_D, INSERT_L = 4.0, 5.5
+BEARING_FRONT = 243.35                 # Vorderkante des hinteren Lagersitzes (wie Original)
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
 WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gtr.PCB_DZ, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
-POST_INSET = 8.0                    # Abstand der Stützen von den Seitenkanten
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
 Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Querverbindungen 2 mm tief
 Z_BEAM_TOP = SHAFT[1] + 6.3 + CLR        # obere Querverbindung über Idler-Arm und Zahnradnabe
@@ -85,7 +85,7 @@ def freiraum():
     sx, sz = SHAFT
     cut = [
         ycyl(sx, sz, 5.5, Y_LID_BACK - 0.1, 236.6),          # Antriebsrad, Passscheibe
-        ycyl(sx, sz, 13.6, 240.25 - CLR, Y_FRAME_BACK + 1.5),   # 50er-Zahnrad, Zahnkranz (3 mm)
+        ycyl(sx, sz, 13.6, 240.25 - CLR, BEARING_FRONT),        # 50er-Zahnrad, Zahnkranz (3 mm, bis y=243.25)
         ycyl(sx, sz, 6.3 + CLR, 235.6, 240.3),                # 50er-Zahnrad, Nabe (max. Ø12,6)
         ycyl(*sh.MOTOR_AX, 4.5, 240.05 - CLR, Y_FRAME_BACK + 1),   # Ritzel (beginnt bei y=240.05)
         # Lagersitze
@@ -122,7 +122,7 @@ def box(x0, x1, y0, y1, z0, z1):
 def _post_geo():
     x0, x1, _, z1 = PCB_RECT
     xl = sh.MOTOR_AX[0] - MOTOR_EAR_DX         # links: mittig unter dem Langloch der Motorschraube
-    xr = x1 - POST_INSET - POST / 2
+    xr = x1 - (xl - x0)                        # rechts symmetrisch zum Abstand der linken vom Rand
     return xl, xr, z1, KNOB_BOT - 0.4          # rechts endet die Stütze unter dem Rändelkopf
 
 
@@ -222,6 +222,8 @@ deckel = build_deckel()
 def build_motorplatte():
     """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz und Idler-Stiftaufnahme."""
     p = motorplatte() + scharnier() + querverbindungen()
+    # Ring vor der Platte: Lagersitz wie im Original 2,5 mm tief (MR85 ganz versenkt)
+    p += ycyl(*SHAFT, 8.2 / 2 + WALL, BEARING_FRONT, sh.MOTOR_FACE_Y - MOTOR_PLATE_T + 0.01)
     p -= motor_langloch(Y_BEAM_FRONT - 1, sh.MOTOR_FACE_Y + 1)      # Langloch auch durch die linke Strebe
     for x, z in schrauben():                                         # M3-Durchgang zu den Einschmelzmuttern
         p -= ycyl(x, z, 1.7, Y_BEAM_FRONT - 0.1, sh.MOTOR_FACE_Y + 0.1)
@@ -291,6 +293,7 @@ _d = deckel + fuehrung_oben + fuehrung_unten + spanneinsatz_halter()
 _sz = SHAFT[1]
 _d -= zcyl(GUIDE_D / 2, _sz + UPPER["bot"] - 1, _sz + UPPER["top"] + 1)       # Filamentkanal frei halten
 _d -= zcyl(BORE_D / 2, _sz + UPPER["bore_bot"], _sz + UPPER["top"] + 1)
+_d -= ycyl(*SHAFT, 7.0 / 2, Y_LID_FRONT - 1, 219.0)        # Ø7 als Verlängerung der Wellenachse nach vorne (wie Original)
 deckel = max(_d.clean().solids(), key=lambda s: s.volume)
 
 if __name__ == "__main__":
