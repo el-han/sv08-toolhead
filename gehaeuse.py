@@ -29,15 +29,15 @@ Y_FRAME_BACK = 242.3                # Rahmen reicht bis in die Platte (Vorderfl�
 X_L = -355.5
 Z_BOT, Z_TOP = sh.Z_HOUSING_BOT, -116.5
 
-SHAFT = (-340.0, -136.32)           # Antriebswelle (x, z)
-PIN = (-326.9, -146.12)
-IDLER = (-331.4, -136.32)           # Idler-Welle (x, z)             # Idler-Drehachse (x, z)
+SHAFT = (-340.0, -136.32 + sh.LIFT)           # Antriebswelle (x, z)
+PIN = (-326.9, -146.12 + sh.LIFT)
+IDLER = (-331.4, -136.32 + sh.LIFT)           # Idler-Welle (x, z)             # Idler-Drehachse (x, z)
 IDLER_SWING = (-2.0, 0.0, 6.0, 12.0)  # Schwenkwinkel des Idlers (Grad, von der Filamentachse weg)
 FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 
 INSERT_D, INSERT_L = 4.0, 5.5
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
-LID_PADS = [(-340.0, -136.32, 4.1 + 1.0), (-326.9, -146.12, 1.65 + 1.0), (-330.2, -128.7, INSERT_D / 2 + 1.0)]   # 1 mm Wand
+LID_PADS = [(*SHAFT, 4.1 + 1.0), (*PIN, 1.65 + 1.0), (-330.2, -128.7, INSERT_D / 2 + 1.0)]   # 1 mm Wand
 LID_T = 2.0                         # Plattenstärke Platinenhalter
 PCB_RECT = (-364.5, -308.5, -161.2, -126.2)   # Umriss der Platinen (x0, x1, z0, z1)
 # Hintere Stiftaufnahme auf dem Hauptkörper
@@ -88,8 +88,8 @@ def freiraum():
     cut.append(Pos(fx, fy, Z_BOT - 1) * Cylinder(FIL_D / 2, Z_TOP - Z_BOT + 2, align=MIN))
     cut.append(Pos(fx, fy, Z_TOP - PTFE_DEPTH) * Cylinder(PTFE_D / 2, PTFE_DEPTH + 1, align=MIN))
     # Spanneinsatz für die Rändelschraube (in X, von +X eingesetzt) + Schraubenkanal
-    cut.append(Pos(-333.4, 228.8, -126.57) * Rot(0, 90, 0) * Cylinder(4.8 / 2, 7.4, align=MIN))
-    cut.append(Pos(-333.4, 228.8, -126.57) * Rot(0, 90, 0) * Cylinder(3.4 / 2, 12.0, align=MIN))
+    cut.append(Pos(-333.4, 228.8, -126.57 + sh.LIFT) * Rot(0, 90, 0) * Cylinder(4.8 / 2, 7.4, align=MIN))
+    cut.append(Pos(-333.4, 228.8, -126.57 + sh.LIFT) * Rot(0, 90, 0) * Cylinder(3.4 / 2, 12.0, align=MIN))
     cut += idler_sweep()
     return tuple(cut)
 

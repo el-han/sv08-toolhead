@@ -27,7 +27,8 @@ GOLIATH_LEN = 43.50 + 25.75  # Oberkante Kühlkörper -> Düsenspitze
 
 # Gehäuse-Unterkante so, dass die Düse auf Originalhöhe liegt
 Z_HOUSING_BOT = b.ORIG_NOZZLE_Z + GOLIATH_LEN + CARRIER_T
-Z0 = Z_HOUSING_BOT - HOUSING_BOT_SH          # z_sv von y_sh = 0 (Antriebswelle)
+LIFT = 1.0                                   # Sherpa über dem Träger angehoben (50er-Zahnrad frei)
+Z0 = Z_HOUSING_BOT - HOUSING_BOT_SH + LIFT   # z_sv von y_sh = 0 (Antriebswelle)
 X0 = b.AX_X - FIL_SH[0]
 Y0 = b.AX_Y + FIL_SH[1]                      # y_sv = Y0 - z_sh
 

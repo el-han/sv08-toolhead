@@ -34,7 +34,7 @@ GOL_SCREWS_DEG = [45, 135, 225, 315]
 SCREW_D, HEAD_D, HEAD_DEPTH = 2.9, 5.0, 2.6     # M2,5 DIN 912
 
 # Rechteckige Platte, hinten direkt mit der Hinterwand (Hauptkörper) verbunden
-HALF_X = 13.0
+X_L, X_R = -367.548, -305.501            # volle Breite des Hauptträgers
 Y_FRONT = 214.2                       # knapp hinter dem Platinenträger (y=214)
 PCB_SCREW, PCB_SCREW_R = (-336.5, -153.2), 2.0
 Y_WALL = 242.8747                     # install_plate.Y_STEP (reicht bis in die Wand)
@@ -44,7 +44,8 @@ Y_WALL = 242.8747                     # install_plate.Y_STEP (reicht bis in die 
 FAN_MIRROR = Plane.YZ.offset(AX_X)
 FAN_FACE_X = -323.80                  # gespiegelt: Lüfterfläche bei x=-347.6
 FAN_SHIFT_X = FAN_FACE_X - (-328.70)
-FAN_DZ = 12.0                         # Lüfter mittig vor den Kühlkörper (über dem Heizblock)
+FAN_TOP_ORIG = -165.075                # Oberkante des 2515 im SV08-Modell (ohne Kabel)
+FAN_DZ = Z_BOT - FAN_TOP_ORIG          # Lüfter direkt unter dem Träger
 FAN_HOLES = [(217.55, -167.57 + FAN_DZ), (237.55, -167.57 + FAN_DZ)]   # (y, z) Lochlage am Lüfter
 FAN_HOLE_D, FAN_HOLE_DEPTH = 2.2, 7.0
 EAR_Y = (215.05, 240.05)
@@ -55,7 +56,7 @@ FAN5020_SHIFT = (0.0, -2.0, 0.0)
 
 # ---------------------------------------------------------------- Träger
 def build():
-    plate = Pos(AX_X, (Y_FRONT + Y_WALL) / 2, Z_BOT) * Box(2 * HALF_X, Y_WALL - Y_FRONT, T, align=MIN)
+    plate = Pos((X_L + X_R) / 2, (Y_FRONT + Y_WALL) / 2, Z_BOT) * Box(X_R - X_L, Y_WALL - Y_FRONT, T, align=MIN)
 
     # Filamentkanal + Zentrierung
     plate -= Pos(AX_X, AX_Y, Z_BOT - 1) * Cylinder(PTFE_D / 2, T + 2, align=MIN)
