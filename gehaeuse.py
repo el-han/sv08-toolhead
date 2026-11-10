@@ -37,9 +37,14 @@ FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 
 INSERT_D, INSERT_L = 4.0, 5.5
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
-LID_PADS = [(*SHAFT, 4.1 + 1.0), (*PIN, 1.65 + 1.0), (-330.2, -128.7, INSERT_D / 2 + 1.0)]   # 1 mm Wand
-LID_T = 2.0                         # Plattenstärke Platinenhalter
+LID_PADS = [(*SHAFT, 4.1 + 2.0), (*PIN, 1.65 + 2.0), (-330.2, -128.7, INSERT_D / 2 + 2.0)]   # 2 mm Wand
+LID_T = 3.0                         # Plattenstärke Platinenhalter
 PCB_RECT = (-364.5, -308.5, -161.2, -126.2)   # Umriss der Platinen (x0, x1, z0, z1)
+# Motorplatte
+MOTOR_PLATE_T = 2.0
+MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5   # Lochabstand der Motorlaschen, Laschenradius
+MOTOR_BOSS_R = 8.0 + CLR                 # Ritzel + Zentrierbund
+SLOT_HALF = 1.5                          # halbe Langlochlänge (Mittenabstand ±1.5 mm)
 # Hintere Stiftaufnahme auf dem Hauptkörper
 PIN_BOSS_R, PIN_BOSS_Y0 = 1.65 + 1.0, 235.35   # 1 mm Wandstärke
 PCB_INSERTS = [(-330.2, -128.7)]    # Platinen-Passschraube im Deckel (die untere sitzt im Träger)
@@ -104,16 +109,14 @@ def scharnier():
 
 
 def build_deckel():
-    """Platinenhalter: 2 mm Platte in Platinengröße, Verdickungen an Lager, Idlerstift und Platineneinsatz."""
+    """Platinenhalter: 3 mm Platte in Platinengröße, Verdickungen an Lager, Idlerstift und Platineneinsatz."""
     x0, x1, z0, z1 = PCB_RECT
     d = Pos((x0 + x1) / 2, Y_LID_FRONT, (z0 + z1) / 2) * Box(
         x1 - x0, LID_T, z1 - z0, align=(Align.CENTER, Align.MIN, Align.CENTER))
     for x, z, r in LID_PADS:
         d += ycyl(x, z, r, Y_LID_FRONT, Y_LID_BACK)
-    # Aussparungen: Goliath-Träger (samt Lüfterohr), 2515-Lüfter und Goliath, je mit Luft
-    for bb in (gtr.traeger.bounding_box(), gtr_fan_bbox(), gtr.gol.bounding_box()):
-        d -= Pos(bb.center().X, Y_LID_FRONT + 5, bb.center().Z) * Box(
-            bb.size.X + 2 * CLR, 20, bb.size.Z + 2 * CLR)
+    # Halter endet an der Oberkante des Goliath-Trägers (darunter trägt der Goliath-Träger die Platine)
+    d -= Pos(0, 0, Z_BOT) * Box(2000, 2000, 100, align=(Align.CENTER, Align.CENTER, Align.MAX))
     for c in freiraum():
         cb = c.bounding_box()
         if cb.min.Y < Y_LID_BACK and cb.max.X > X_L and cb.max.Y > Y_LID_FRONT:
@@ -123,6 +126,23 @@ def build_deckel():
     return max(d.clean().solids(), key=lambda s: s.volume)
 
 
+def motorplatte():
+    """2 mm Platte vor der Motor-Anlagefläche bis auf den Hauptträger (eigenes Teil): Durchgang für Ritzel/Zentrierbund,
+    hinterer Lagersitz (über freiraum), zwei M3-Löcher in den Motorlaschen, links (von vorne) als Langloch."""
+    mx, mz = sh.MOTOR_AX
+    y1 = sh.MOTOR_FACE_Y
+    y0 = y1 - MOTOR_PLATE_T
+    x0, x1 = mx - MOTOR_EAR_DX - MOTOR_EAR_R, mx + MOTOR_EAR_DX + MOTOR_EAR_R
+    z1 = sh.get("motor")[0].bounding_box().max.Z
+    p = Pos((x0 + x1) / 2, (y0 + y1) / 2, (Z_BOT + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - Z_BOT)
+    p -= ycyl(mx, mz, MOTOR_BOSS_R, y0 - 1, y1 + 1)
+    p -= ycyl(mx + MOTOR_EAR_DX, mz, 1.7, y0 - 1, y1 + 1)
+    xl = mx - MOTOR_EAR_DX                              # Langloch, vertikal
+    p -= ycyl(xl, mz - SLOT_HALF, 1.7, y0 - 1, y1 + 1) + ycyl(xl, mz + SLOT_HALF, 1.7, y0 - 1, y1 + 1)
+    p -= Pos(xl, y0 + MOTOR_PLATE_T / 2, mz) * Box(3.4, MOTOR_PLATE_T + 2, 2 * SLOT_HALF)
+    return p
+
+
 def gtr_fan_bbox():
     """Lage des (verschobenen, gespiegelten) 2515-Lüfters, aus dem SV08-Modell."""
     fan = next(p for l, p in b.sv08_parts() if "2515_pipe_cooling_fan" in l)
@@ -130,6 +150,20 @@ def gtr_fan_bbox():
 
 
 deckel = build_deckel()
+
+
+def build_motorplatte():
+    """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz."""
+    p = motorplatte()
+    y0 = sh.MOTOR_FACE_Y - MOTOR_PLATE_T
+    for c in freiraum():
+        cb = c.bounding_box()
+        if cb.max.Y > y0 and cb.min.Y < sh.MOTOR_FACE_Y:
+            p -= c
+    return max(p.clean().solids(), key=lambda s: s.volume)
+
+
+motorplatte_teil = build_motorplatte()
 
 if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)

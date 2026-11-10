@@ -46,7 +46,7 @@ MOTOR_AX = to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[0::2]   # (x, z)
 MOTOR_FACE_Y = Y0 - MOTOR_FACE_SH
 
 # Motor um die eigene Achse gedreht, von vorne gesehen im Uhrzeigersinn (Ritzel bleibt koaxial)
-MOTOR_ROT = 36.0
+MOTOR_ROT = 0.0
 MOTOR_TURN = Pos(MOTOR_AX[0], 0, MOTOR_AX[1]) * Rot(0, MOTOR_ROT, 0) * Pos(-MOTOR_AX[0], 0, -MOTOR_AX[1])
 
 # Teile über Volumen identifiziert (Labels im STEP sind teils doppelt)

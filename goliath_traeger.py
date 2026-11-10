@@ -35,7 +35,7 @@ SCREW_D, HEAD_D, HEAD_DEPTH = 2.9, 5.0, 2.6     # M2,5 DIN 912
 
 # Rechteckige Platte, hinten direkt mit der Hinterwand (Hauptkörper) verbunden
 X_L, X_R = -367.548, -305.501            # volle Breite des Hauptträgers
-Y_FRONT = 214.2                       # knapp hinter dem Platinenträger (y=214)
+Y_FRONT = 214.2                       # bis zur Platine (Platinenträger bei y=214)
 PCB_SCREW, PCB_SCREW_R = (-336.5, -153.2), 2.0
 Y_WALL = 242.8747                     # install_plate.Y_STEP (reicht bis in die Wand)
 
