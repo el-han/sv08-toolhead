@@ -18,6 +18,7 @@ import sherpa as sh
 
 FRONT5020 = ["5020_turbofan", "air_duct_5020", "cover_plate3", "M2_5X8"]
 FAN2515 = "2515_pipe_cooling_fan"
+FIL_R = 0.95                       # Filament Ø1,75 mit etwas Luft (Führung Ø2,1)
 
 
 # Entfallene SV08-Schrauben, über Lage identifiziert (x, z, Achse):
@@ -68,7 +69,8 @@ def sv08_placed():
 
 
 def sherpa_placed():
-    return [(f"sherpa_{n}", "Sherpa", p) for n, p in sh.parts if n not in sh.UNUSED]
+    return ([(f"sherpa_{n}", "Sherpa", p) for n, p in sh.parts if n not in sh.UNUSED]
+            + [("sherpa_einschmelzmutter_idler", "Sherpa", sh.idler_insert())])
 
 
 def overlap(a, c):
@@ -220,6 +222,8 @@ if __name__ == "__main__":
         others = [(n, t, p) for n, t, p in sv + sp]
         for oname, obj in new:
             for n, t, p in others:
+                if "einschmelzmutter" in n:        # Presssitz (Ø5,0 in Ø4,8) ist gewollt
+                    continue
                 v = overlap(obj, p)
                 if oname == "Hauptkörper":
                     v -= base_sherpa.get(id(p), 0)
@@ -236,6 +240,19 @@ if __name__ == "__main__":
                 print(f"  {new[i][0]} <-> {new[j][0]}: {v:.2f} mm^3")
                 if v > 0.05:
                     bad = True
+        # Filamentweg (Ø1,75 + Luft) vom Goliath-Einlass bis zur Oberkante der oberen Führung muss frei sein
+        from build123d import Cylinder, Align
+        z_fil0 = gtr.Z_BOT
+        z_fil1 = gh.SHAFT[1] + gh.UPPER["top"]
+        fil = Pos(b.AX_X, b.AX_Y, z_fil0) * Cylinder(FIL_R, z_fil1 - z_fil0,
+                                                     align=(Align.CENTER, Align.CENTER, Align.MIN))
+        for oname, obj in new:
+            if oname == "Goliath":
+                continue
+            v = overlap(obj, fil)
+            if v > 0.001:
+                bad = True
+                print(f"  FILAMENTWEG blockiert durch {oname}: {v:.3f} mm^3")
         print(f"Düse z={gtr.nozzle_z:.2f} (Original {b.ORIG_NOZZLE_Z}); "
               f"Motorachse x={sh.MOTOR_AX[0]:.2f} z={sh.MOTOR_AX[1]:.2f}")
         print("Keine Kollisionen." if not bad else "Siehe Kollisionen oben.")

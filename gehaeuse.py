@@ -240,6 +240,7 @@ motorplatte_teil = build_motorplatte()
 # (dort gemessen relativ zur Antriebswelle, z-Versatz zur Wellenachse)
 GUIDE_D, BORE_D = 2.1, 4.2            # Führung / Aufnahme (PTFE bzw. Bohrung)
 GUIDE_WALL = 1.5
+INSERT_WALL = 1.5                        # Wand um die Einschmelzmutter der Rändelschraube
 GEAR_CUT_R = 4.75 + 0.75                 # Antriebs-/Idler-Rad (r4,75) mit Luft
 UPPER = dict(top=18.0, bore_bot=5.32, bot=2.42)     # oben: Bohrung bis 5.32, Führung bis 2.42 über der Welle
 LOWER = dict(top=-2.38, guide_bot=-5.28)           # unten: Führung bis -5.28, darunter Bohrung bis zum Träger
@@ -273,9 +274,24 @@ def build_fuehrungen():
     return up, lo
 
 
-# Filamentführungen gehören zum Platinenhalter
+def spanneinsatz_halter():
+    """Zylinder (Achse X) um die Einschmelzmutter der Rändelschraube, Lage wie im Original-Sherpa.
+    Schließt an die obere Filamentführung an; die Mutter wird von +X eingesetzt."""
+    q = sh.idler_insert().bounding_box()
+    c = q.center()
+    x0, x1 = q.min.X - 0.6 - INSERT_WALL, q.max.X
+    h = Pos(x0, c.Y, c.Z) * Rot(0, 90, 0) * Cylinder(4.8 / 2 + INSERT_WALL, x1 - x0, align=MIN)
+    h -= Pos(q.min.X - 0.6, c.Y, c.Z) * Rot(0, 90, 0) * Cylinder(4.8 / 2, x1 - q.min.X + 1.6, align=MIN)
+    return h
+
+
+# Filamentführungen und Spanneinsatz-Halter gehören zum Platinenhalter
 fuehrung_oben, fuehrung_unten = build_fuehrungen()
-deckel = max((deckel + fuehrung_oben + fuehrung_unten).clean().solids(), key=lambda s: s.volume)
+_d = deckel + fuehrung_oben + fuehrung_unten + spanneinsatz_halter()
+_sz = SHAFT[1]
+_d -= zcyl(GUIDE_D / 2, _sz + UPPER["bot"] - 1, _sz + UPPER["top"] + 1)       # Filamentkanal frei halten
+_d -= zcyl(BORE_D / 2, _sz + UPPER["bore_bot"], _sz + UPPER["top"] + 1)
+deckel = max(_d.clean().solids(), key=lambda s: s.volume)
 
 if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)

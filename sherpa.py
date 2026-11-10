@@ -117,6 +117,12 @@ def get(name):
 UNUSED = {"housing_core", "housing_rear", "housing_front", "housing_front_k", "idler_arm_long",
           "einschmelzmutter_M3", "schraube_M3x12_motor", "schraube_M3x16_gehaeuse", "schraube_M3x8_deckel"}
 
+def idler_insert():
+    """Einschmelzmutter für die Rändelschraube des Idlers (liegt im Original im Gehäusekern)."""
+    return next(p for n, p in parts if n == "einschmelzmutter_M3" and abs(p.bounding_box().center().X - (X0 + 9.2)) < 1.0
+                and p.bounding_box().size.X < p.bounding_box().size.Y)
+
+
 if __name__ == "__main__":
     print(f"Motorachse x={MOTOR_AX[0]:.2f} z={MOTOR_AX[1]:.2f}, Anlagefläche y={MOTOR_FACE_Y:.2f}")
     print(f"Gehäuse-Unterkante z={Z_HOUSING_BOT:.2f}")
