@@ -44,7 +44,8 @@ POST_INSET = 8.0                    # Abstand der Stützen von den Seitenkanten
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
 Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Querverbindungen 2 mm tief
 Z_BEAM_TOP = SHAFT[1] + 6.3 + CLR        # obere Querverbindung über Idler-Arm und Zahnradnabe
-POST = 5.0                          # Querschnitt der Eckstützen (quadratisch)
+BEAM_H = 5.0                        # Höhe der Querverbindungen
+POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
 PCB_RECT = (*X_FULL, -161.2, -126.2)           # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
@@ -118,15 +119,25 @@ def box(x0, x1, y0, y1, z0, z1):
     return Pos((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - z0)
 
 
-def stuetzen():
-    """Vier Stützen im Platinenhalter (x-Mitte, z0, z1): unten links/rechts, oben links bündig mit der
-    Oberkante des Platinenhalters, oben rechts unter dem Rändelkopf."""
+def _post_geo():
     x0, x1, _, z1 = PCB_RECT
     xl = sh.MOTOR_AX[0] - MOTOR_EAR_DX         # links: mittig unter dem Langloch der Motorschraube
     xr = x1 - POST_INSET - POST / 2
-    zt1 = KNOB_BOT - 0.4
-    return [(xl, Z_BOT, Z_BOT + POST), (xr, Z_BOT, Z_BOT + POST),
-            (xl, z1 - POST, z1), (xr, zt1 - POST, zt1)]
+    return xl, xr, z1, KNOB_BOT - 0.4          # rechts endet die Stütze unter dem Rändelkopf
+
+
+def stuetzen():
+    """Zwei durchgehende Stützen im Platinenhalter (x-Mitte, z0, z1): links bis zur Oberkante des
+    Platinenhalters, rechts bis unter den Rändelkopf."""
+    xl, xr, zl, zr = _post_geo()
+    return [(xl, Z_BOT, zl), (xr, Z_BOT, zr)]
+
+
+def schrauben():
+    """Vier M3-Verschraubungen (x, z): unten 1 mm über der Stützenmitte, oben mittig im oberen Stützenende."""
+    xl, xr, zl, zr = _post_geo()
+    zb = Z_BOT + POST / 2 + 1.0
+    return [(xl, zb), (xr, zb), (xl, zl - POST / 2), (xr, zr - POST / 2)]
 
 
 def querverbindungen():
@@ -137,9 +148,9 @@ def querverbindungen():
     # die linke reicht über das Langloch der Motorschraube hinaus
     z_slot_top = sh.MOTOR_AX[1] + SLOT_HALF + 1.7
     out = [box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, Z_BOT, zt)
-           for x, zt in ((st[0][0], z_slot_top + 2.0), (st[1][0], Z_BEAM_TOP + POST))]
+           for x, zt in ((st[0][0], z_slot_top + 2.0), (st[1][0], Z_BEAM_TOP + BEAM_H))]
     xl, xr = st[0][0], st[1][0]
-    for za, zb in ((Z_BOT, Z_BOT + POST), (Z_BEAM_TOP, Z_BEAM_TOP + POST)):
+    for za, zb in ((Z_BOT, Z_BOT + BEAM_H), (Z_BEAM_TOP, Z_BEAM_TOP + BEAM_H)):
         out.append(box(xl - POST / 2, xr + POST / 2, Y_BEAM_FRONT, Y_BEAM_BACK, za, zb))
     r = out[0]
     for o in out[1:]:
@@ -163,6 +174,9 @@ def build_deckel():
     # Stützen bis zum Beginn der Querverbindungen (der Rest gehört zur Motorplatte)
     for x, za, zb in stuetzen():
         d += box(x - POST / 2, x + POST / 2, Y_LID_FRONT + LID_T - 0.01, Y_BEAM_FRONT, za, zb)
+    # Einschmelzmuttern in den Stützen (verschraubt von der Motorseite)
+    for x, z in schrauben():
+        d -= ycyl(x, z, INSERT_D / 2, Y_BEAM_FRONT - INSERT_L, Y_BEAM_FRONT + 0.1)
     for x, z in PCB_INSERTS:
         d -= ycyl(x, z, INSERT_D / 2, Y_LID_FRONT - 0.1, Y_LID_FRONT + INSERT_L)
     return max(d.clean().solids(), key=lambda s: s.volume)
@@ -209,6 +223,8 @@ def build_motorplatte():
     """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz und Idler-Stiftaufnahme."""
     p = motorplatte() + scharnier() + querverbindungen()
     p -= motor_langloch(Y_BEAM_FRONT - 1, sh.MOTOR_FACE_Y + 1)      # Langloch auch durch die linke Strebe
+    for x, z in schrauben():                                         # M3-Durchgang zu den Einschmelzmuttern
+        p -= ycyl(x, z, 1.7, Y_BEAM_FRONT - 0.1, sh.MOTOR_FACE_Y + 0.1)
     y0 = PIN_BOSS_Y0
     for c in freiraum():
         cb = c.bounding_box()
