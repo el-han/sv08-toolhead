@@ -184,9 +184,7 @@ def assembly_tree(eb, gtr, sv, sp):
 
     neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
                               _named(gh.deckel, "Deckel", NEW_COLORS["Deckel"]),
-                              _named(gh.motorplatte_teil, "Motorplatte", NEW_COLORS["Motorplatte"]),
-                              _named(gh.fuehrung_oben, "Filamentfuehrung_oben", NEW_COLORS["Fuehrung"]),
-                              _named(gh.fuehrung_unten, "Filamentfuehrung_unten", NEW_COLORS["Fuehrung"])])
+                              _named(gh.motorplatte_teil, "Motorplatte", NEW_COLORS["Motorplatte"])])
     gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
@@ -204,8 +202,7 @@ if __name__ == "__main__":
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Motorplatte", gh.motorplatte_teil),
-           ("Führung oben", gh.fuehrung_oben), ("Führung unten", gh.fuehrung_unten), ("Goliath", gtr.gol)]
+    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Motorplatte", gh.motorplatte_teil), ("Goliath", gtr.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False

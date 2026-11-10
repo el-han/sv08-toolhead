@@ -240,6 +240,7 @@ motorplatte_teil = build_motorplatte()
 # (dort gemessen relativ zur Antriebswelle, z-Versatz zur Wellenachse)
 GUIDE_D, BORE_D = 2.1, 4.2            # Führung / Aufnahme (PTFE bzw. Bohrung)
 GUIDE_WALL = 1.5
+GEAR_CUT_R = 4.75 + 0.75                 # Antriebs-/Idler-Rad (r4,75) mit Luft
 UPPER = dict(top=18.0, bore_bot=5.32, bot=2.42)     # oben: Bohrung bis 5.32, Führung bis 2.42 über der Welle
 LOWER = dict(top=-2.38, guide_bot=-5.28)           # unten: Führung bis -5.28, darunter Bohrung bis zum Träger
 
@@ -252,24 +253,29 @@ def build_fuehrungen():
     sz = SHAFT[1]
     ro = BORE_D / 2 + GUIDE_WALL
     up = zcyl(ro, sz + UPPER["bot"], sz + UPPER["top"])
+    lo = zcyl(ro, Z_BOT, sz + LOWER["top"])
+    # Stege nach vorne zum Platinenhalter, so breit wie das Rohr (innerhalb der Höhe des Halters)
+    yb = Y_LID_FRONT + LID_T - 0.01
+    z_lid_top = PCB_RECT[3]
+    up += box(b.AX_X - ro, b.AX_X + ro, yb, b.AX_Y, sz + UPPER["bot"], min(sz + UPPER["top"], z_lid_top))
+    lo += box(b.AX_X - ro, b.AX_X + ro, yb, b.AX_Y, Z_BOT, sz + LOWER["top"])
+    # Bohrungen nach den Stegen, damit sie frei bleiben
     up -= zcyl(GUIDE_D / 2, sz + UPPER["bot"] - 1, sz + UPPER["top"] + 1)
     up -= zcyl(BORE_D / 2, sz + UPPER["bore_bot"], sz + UPPER["top"] + 1)
-    lo = zcyl(ro, Z_BOT, sz + LOWER["top"])
     lo -= zcyl(GUIDE_D / 2, Z_BOT - 1, sz + LOWER["top"] + 1)
     lo -= zcyl(BORE_D / 2, Z_BOT - 1, sz + LOWER["guide_bot"])
-    # Freiräume für Antriebsrad und Idler (samt Schwenkbereich) und Platinenhalter aussparen
-    for c in freiraum():
-        cb = c.bounding_box()
-        on_axis = abs(cb.center().X - b.AX_X) < 0.01 and abs(cb.center().Y - b.AX_Y) < 0.01
-        if cb.max.Z > Z_BOT and cb.min.Z < sz + UPPER["top"] and not on_axis:
-            up -= c
-            lo -= c
-    up -= deckel
-    lo -= deckel
+    # Aussparungen für Antriebsrad und Idler-Rad: zwei gleich große Kreise (Achsen in Y), symmetrisch
+    # zur Filamentachse
+    for x in (SHAFT[0], 2 * b.AX_X - SHAFT[0]):
+        c = ycyl(x, sz, GEAR_CUT_R, b.AX_Y - 20, b.AX_Y + 20)
+        up -= c
+        lo -= c
     return up, lo
 
 
+# Filamentführungen gehören zum Platinenhalter
 fuehrung_oben, fuehrung_unten = build_fuehrungen()
+deckel = max((deckel + fuehrung_oben + fuehrung_unten).clean().solids(), key=lambda s: s.volume)
 
 if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)
