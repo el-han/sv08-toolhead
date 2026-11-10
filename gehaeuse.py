@@ -40,7 +40,8 @@ INSERT_D, INSERT_L = 4.0, 5.5
 WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7, INSERT_D / 2 + WALL)]
 LID_T = 3.0                         # Plattenstärke Platinenhalter
-PCB_RECT = (-364.5, -308.5, -161.2, -126.2)   # Umriss der Platinen (x0, x1, z0, z1)
+X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
+PCB_RECT = (*X_FULL, -161.2, -126.2)           # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
 # Motorplatte
 MOTOR_PLATE_T = 2.0
 MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5   # Lochabstand der Motorlaschen, Laschenradius
@@ -130,7 +131,7 @@ def motorplatte():
     mx, mz = sh.MOTOR_AX
     y1 = sh.MOTOR_FACE_Y
     y0 = y1 - MOTOR_PLATE_T
-    x0, x1 = mx - MOTOR_EAR_DX - MOTOR_EAR_R, mx + MOTOR_EAR_DX + MOTOR_EAR_R
+    x0, x1 = X_FULL
     z1 = sh.get("motor")[0].bounding_box().max.Z
     p = Pos((x0 + x1) / 2, (y0 + y1) / 2, (Z_BOT + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - Z_BOT)
     # Durchgang Ritzel/Zentrierbund als Langloch: Schwenken um die rechte Schraube verschiebt die Achse
@@ -166,6 +167,42 @@ def build_motorplatte():
 
 
 motorplatte_teil = build_motorplatte()
+
+
+# Filamentführungen ober- und unterhalb der Antriebsräder, Maße wie im Original-Sherpa-Gehäuse
+# (dort gemessen relativ zur Antriebswelle, z-Versatz zur Wellenachse)
+GUIDE_D, BORE_D = 2.1, 4.2            # Führung / Aufnahme (PTFE bzw. Bohrung)
+GUIDE_WALL = 1.5
+UPPER = dict(top=18.0, bore_bot=5.32, bot=2.42)     # oben: Bohrung bis 5.32, Führung bis 2.42 über der Welle
+LOWER = dict(top=-2.38, guide_bot=-5.28)           # unten: Führung bis -5.28, darunter Bohrung bis zum Träger
+
+
+def zcyl(r, z0, z1):
+    return Pos(b.AX_X, b.AX_Y, z0) * Cylinder(r, z1 - z0, align=MIN)
+
+
+def build_fuehrungen():
+    sz = SHAFT[1]
+    ro = BORE_D / 2 + GUIDE_WALL
+    up = zcyl(ro, sz + UPPER["bot"], sz + UPPER["top"])
+    up -= zcyl(GUIDE_D / 2, sz + UPPER["bot"] - 1, sz + UPPER["top"] + 1)
+    up -= zcyl(BORE_D / 2, sz + UPPER["bore_bot"], sz + UPPER["top"] + 1)
+    lo = zcyl(ro, Z_BOT, sz + LOWER["top"])
+    lo -= zcyl(GUIDE_D / 2, Z_BOT - 1, sz + LOWER["top"] + 1)
+    lo -= zcyl(BORE_D / 2, Z_BOT - 1, sz + LOWER["guide_bot"])
+    # Freiräume für Antriebsrad und Idler (samt Schwenkbereich) und Platinenhalter aussparen
+    for c in freiraum():
+        cb = c.bounding_box()
+        on_axis = abs(cb.center().X - b.AX_X) < 0.01 and abs(cb.center().Y - b.AX_Y) < 0.01
+        if cb.max.Z > Z_BOT and cb.min.Z < sz + UPPER["top"] and not on_axis:
+            up -= c
+            lo -= c
+    up -= deckel
+    lo -= deckel
+    return up, lo
+
+
+fuehrung_oben, fuehrung_unten = build_fuehrungen()
 
 if __name__ == "__main__":
     b.OUT.mkdir(exist_ok=True)

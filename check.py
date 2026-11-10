@@ -112,7 +112,7 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
 
 
 # ---------------------------------------------------------------- Baum für check_assembly.step
-NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Deckel": (0.20, 0.55, 0.80), "Motorplatte": (0.85, 0.75, 0.20), "Goliath_Traeger": (0.15, 0.40, 0.85)}
+NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Deckel": (0.20, 0.55, 0.80), "Motorplatte": (0.85, 0.75, 0.20), "Fuehrung": (0.90, 0.30, 0.30), "Goliath_Traeger": (0.15, 0.40, 0.85)}
 SHERPA_COLORS = [("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
                  ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
                  ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
@@ -184,7 +184,9 @@ def assembly_tree(eb, gtr, sv, sp):
 
     neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
                               _named(gh.deckel, "Deckel", NEW_COLORS["Deckel"]),
-                              _named(gh.motorplatte_teil, "Motorplatte", NEW_COLORS["Motorplatte"])])
+                              _named(gh.motorplatte_teil, "Motorplatte", NEW_COLORS["Motorplatte"]),
+                              _named(gh.fuehrung_oben, "Filamentfuehrung_oben", NEW_COLORS["Fuehrung"]),
+                              _named(gh.fuehrung_unten, "Filamentfuehrung_unten", NEW_COLORS["Fuehrung"])])
     gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
@@ -202,7 +204,8 @@ if __name__ == "__main__":
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Motorplatte", gh.motorplatte_teil), ("Goliath", gtr.gol)]
+    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Motorplatte", gh.motorplatte_teil),
+           ("Führung oben", gh.fuehrung_oben), ("Führung unten", gh.fuehrung_unten), ("Goliath", gtr.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False
