@@ -46,8 +46,11 @@ def sv08_placed():
         if "M3x12" in label and z < -196:                 # Sensor-/Deflektorschrauben bleiben
             out.append((label, "original", p))
             continue
-        if "shoulder_screws" in label and "4xM3" in label:  # Platinen-Passschrauben
-            out.append((label, "original", p))
+        if "shoulder_screws" in label and "4xM3" in label:  # Platinen-Passschrauben (mit der Platine angehoben)
+            out.append((label, "Platine hoch", Pos(0, 0, gtr.PCB_DZ) * p))
+            continue
+        if "adapter_plate" in label:                       # Platinen (Adapterplatten) angehoben
+            out.append((label, "Platine hoch", Pos(0, 0, gtr.PCB_DZ) * p))
             continue
         if any(k in label for k in b.REMOVED_SHERPA):
             continue

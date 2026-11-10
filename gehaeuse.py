@@ -38,7 +38,7 @@ FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 INSERT_D, INSERT_L = 4.0, 5.5
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
 WALL = 1.5                          # Wandstärke der Zylinder
-LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7, INSERT_D / 2 + WALL)]
+LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gtr.PCB_DZ, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
 POST_INSET = 8.0                    # Abstand der Stützen von den Seitenkanten
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
@@ -48,7 +48,7 @@ BEAM_H = 5.0                        # Höhe der Querverbindungen
 POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
-PCB_RECT = (*X_FULL, -161.2, -126.2)           # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
+PCB_RECT = (*X_FULL, -161.2 + gtr.PCB_DZ, -126.2 + gtr.PCB_DZ)          # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
 # Motorplatte
 MOTOR_PLATE_T = 2.0
 MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5   # Lochabstand der Motorlaschen, Laschenradius
@@ -56,7 +56,7 @@ MOTOR_BOSS_R = 8.0 + CLR                 # Ritzel + Zentrierbund
 SLOT_HALF = 1.5                          # halbe Langlochlänge (Mittenabstand ±1.5 mm)
 # Hintere Stiftaufnahme auf dem Hauptkörper
 PIN_BOSS_R, PIN_BOSS_Y0 = 1.65 + WALL, 235.35
-PCB_INSERTS = [(-330.2, -128.7)]    # Platinen-Passschraube im Deckel (die untere sitzt im Träger)
+PCB_INSERTS = [(-330.2, -128.7 + gtr.PCB_DZ)]    # Platinen-Passschraube im Deckel (die untere sitzt im Träger)
 
 
 def ycyl(x, z, r, y0, y1):
