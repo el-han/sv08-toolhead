@@ -39,6 +39,9 @@ INSERT_D, INSERT_L = 4.0, 5.5
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
 WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7, INSERT_D / 2 + WALL)]
+KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
+POST_INSET = 8.0                    # Abstand der Stützen von den Seitenkanten
+POST = 5.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
 PCB_RECT = (*X_FULL, -161.2, -126.2)           # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
@@ -120,6 +123,13 @@ def build_deckel():
         cb = c.bounding_box()
         if cb.min.Y < Y_LID_BACK and cb.max.X > X_L and cb.max.Y > Y_LID_FRONT:
             d -= c
+    # Eckstützen bis zur Motorplatte
+    y0, y1 = Y_LID_FRONT + LID_T - 0.01, sh.MOTOR_FACE_Y - MOTOR_PLATE_T
+    for x in (x0 + POST_INSET + POST / 2, x1 - POST_INSET - POST / 2):
+        for z in (max(z0, Z_BOT) + POST / 2, z1 - POST / 2):
+            if x > (x0 + x1) / 2 and z > Z_BOT + POST:  # oben rechts: unter Rändelkopf und Feder
+                z = KNOB_BOT - 0.4 - POST / 2
+            d += Pos(x, (y0 + y1) / 2, z) * Box(POST, y1 - y0, POST)
     for x, z in PCB_INSERTS:
         d -= ycyl(x, z, INSERT_D / 2, Y_LID_FRONT - 0.1, Y_LID_FRONT + INSERT_L)
     return max(d.clean().solids(), key=lambda s: s.volume)
