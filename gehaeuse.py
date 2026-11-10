@@ -41,6 +41,9 @@ WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
 POST_INSET = 8.0                    # Abstand der Stützen von den Seitenkanten
+Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
+Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Querverbindungen 2 mm tief
+Z_BEAM_TOP = SHAFT[1] + 6.3 + CLR        # obere Querverbindung über Idler-Arm und Zahnradnabe
 POST = 5.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
@@ -81,8 +84,9 @@ def freiraum():
     sx, sz = SHAFT
     cut = [
         ycyl(sx, sz, 5.5, Y_LID_BACK - 0.1, 236.6),          # Antriebsrad, Passscheibe
-        ycyl(sx, sz, 13.6, 235.6, Y_FRAME_BACK + 1.5),         # 50er-Zahnrad
-        ycyl(*sh.MOTOR_AX, 4.5, 235.6, Y_FRAME_BACK + 1),      # Ritzel
+        ycyl(sx, sz, 13.6, 240.25 - CLR, Y_FRAME_BACK + 1.5),   # 50er-Zahnrad, Zahnkranz (3 mm)
+        ycyl(sx, sz, 6.3 + CLR, 235.6, 240.3),                # 50er-Zahnrad, Nabe (max. Ø12,6)
+        ycyl(*sh.MOTOR_AX, 4.5, 240.05 - CLR, Y_FRAME_BACK + 1),   # Ritzel (beginnt bei y=240.05)
         # Lagersitze
         ycyl(sx, sz, 8.2 / 2, 218.98, Y_LID_BACK + 0.3),
         ycyl(sx, sz, 7.0 / 2, 218.25, 219.0),
@@ -110,6 +114,35 @@ def scharnier():
     return ycyl(px, pz, PIN_BOSS_R, PIN_BOSS_Y0, sh.MOTOR_FACE_Y - MOTOR_PLATE_T + 0.01)
 
 
+def box(x0, x1, y0, y1, z0, z1):
+    return Pos((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - z0)
+
+
+def stuetzen():
+    """Vier Stützen im Platinenhalter (x-Mitte, z0, z1): unten links/rechts, oben links auf Höhe der
+    oberen Querverbindung, oben rechts unter dem Rändelkopf."""
+    x0, x1, _, _ = PCB_RECT
+    xl, xr = x0 + POST_INSET + POST / 2, x1 - POST_INSET - POST / 2
+    zt1 = KNOB_BOT - 0.4
+    return [(xl, Z_BOT, Z_BOT + POST), (xr, Z_BOT, Z_BOT + POST),
+            (xl, Z_BEAM_TOP, Z_BEAM_TOP + POST), (xr, zt1 - POST, zt1)]
+
+
+def querverbindungen():
+    """Stützen ab Y_BEAM_FRONT bis zur Motorplatte und die waagrechten Verbindungen oben und unten."""
+    yw = sh.MOTOR_FACE_Y - MOTOR_PLATE_T
+    st = stuetzen()
+    st[3] = (st[3][0], st[3][1], Z_BEAM_TOP + POST)      # rechte obere Stütze bis zur Querverbindung erweitert
+    out = [box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, za, zb) for x, za, zb in st]
+    xl, xr = st[0][0], st[1][0]
+    for za, zb in ((Z_BOT, Z_BOT + POST), (Z_BEAM_TOP, Z_BEAM_TOP + POST)):
+        out.append(box(xl - POST / 2, xr + POST / 2, Y_BEAM_FRONT, Y_BEAM_BACK, za, zb))
+    r = out[0]
+    for o in out[1:]:
+        r += o
+    return r
+
+
 def build_deckel():
     """Platinenhalter: 3 mm Platte in Platinengröße, Verdickungen an Lager, Idlerstift und Platineneinsatz."""
     x0, x1, z0, z1 = PCB_RECT
@@ -123,13 +156,9 @@ def build_deckel():
         cb = c.bounding_box()
         if cb.min.Y < Y_LID_BACK and cb.max.X > X_L and cb.max.Y > Y_LID_FRONT:
             d -= c
-    # Eckstützen bis zur Motorplatte
-    y0, y1 = Y_LID_FRONT + LID_T - 0.01, sh.MOTOR_FACE_Y - MOTOR_PLATE_T
-    for x in (x0 + POST_INSET + POST / 2, x1 - POST_INSET - POST / 2):
-        for z in (max(z0, Z_BOT) + POST / 2, z1 - POST / 2):
-            if x > (x0 + x1) / 2 and z > Z_BOT + POST:  # oben rechts: unter Rändelkopf und Feder
-                z = KNOB_BOT - 0.4 - POST / 2
-            d += Pos(x, (y0 + y1) / 2, z) * Box(POST, y1 - y0, POST)
+    # Stützen bis zum Beginn der Querverbindungen (der Rest gehört zur Motorplatte)
+    for x, za, zb in stuetzen():
+        d += box(x - POST / 2, x + POST / 2, Y_LID_FRONT + LID_T - 0.01, Y_BEAM_FRONT, za, zb)
     for x, z in PCB_INSERTS:
         d -= ycyl(x, z, INSERT_D / 2, Y_LID_FRONT - 0.1, Y_LID_FRONT + INSERT_L)
     return max(d.clean().solids(), key=lambda s: s.volume)
@@ -167,7 +196,7 @@ deckel = build_deckel()
 
 def build_motorplatte():
     """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz und Idler-Stiftaufnahme."""
-    p = motorplatte() + scharnier()
+    p = motorplatte() + scharnier() + querverbindungen()
     y0 = PIN_BOSS_Y0
     for c in freiraum():
         cb = c.bounding_box()
