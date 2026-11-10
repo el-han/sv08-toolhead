@@ -1,7 +1,9 @@
 """
 Hauptkörper für den Sherpa-Umbau (Zwischenstand).
 
-Vereinfachte Install-Plate (install_plate.py), nach oben verlängert, mit Motorvertiefung
+Oberteil der vereinfachten Install-Plate (install_plate.py), nach oben verlängert; darunter ein
+Quader von der Eddy-Sonde bis zum Goliath-Träger mit allen Bohrungen, Kabelrinne und Aussparungen
+für Sliding Panel und Riemenklemmen (Magnete entfallen); mit Motorvertiefung
 (LDO 36STH17), Goliath-Träger und der hinteren Idler-Stiftaufnahme aus gehaeuse.py (Deckel separat).
 """
 import math
@@ -58,25 +60,68 @@ def motor_screw_holes():
 
 
 
+# Unterteil des Hauptträgers als Quader (ersetzt die Install-Plate unterhalb des Goliath-Trägers)
+X_PL, X_PR = -367.548, -305.501            # Breite wie bisher (62 mm)
+Z_SPLIT = gtr.Z_TOP                        # Oberkante Goliath-Träger
+Z_BLOCK_BOT = -222.2                       # Unterkante der Eddy-Sonde
+# SV08-Teile, die in der Platte sitzen und eine Aussparung brauchen (Metallaufnahme am Schlitten)
+POCKETS = ["xtruder_sliding_panel"]
+
+
+def offset_cut(body, part, clr=CLR):
+    """Teil mit Luft in X und Z ausschneiden (keine Luft in Y, damit die Rückseite plan bleibt)."""
+    for d in ((0, 0, 0), (clr, 0, 0), (-clr, 0, 0), (0, 0, clr), (0, 0, -clr)):
+        body -= Pos(*d) * part
+    return body
+
+
+def box_cut(x0, x1, y0, y1, z0, z1):
+    return Pos((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2) * Box(x1 - x0, y1 - y0, z1 - z0)
+
+
+def quader_taschen():
+    """Quaderförmige Aussparungen: Riemenklemmen seitlich bis nach außen, Luftführung bis zur Unterkante."""
+    out = []
+    for p in b.find("belt_lock_block"):
+        q = p.bounding_box()
+        left = q.center().X < (X_PL + X_PR) / 2
+        x0, x1 = (X_PL - 1, q.max.X + CLR) if left else (q.min.X - CLR, X_PR + 1)
+        out.append(box_cut(x0, x1, ip.Y_FRONT - 1, ip.Y_BACK + 1, q.min.Z - CLR, q.max.Z + CLR))   # durchgehend
+    # Luftführung: nur der Teil, der in der Platte steckt (darüber tragen die Schrauben)
+    blk = box_cut(X_PL, X_PR, ip.Y_FRONT, ip.Y_BACK, Z_BLOCK_BOT, Z_SPLIT)
+    q = (b.find("air_deflector2")[0] & blk).bounding_box()
+    out.append(box_cut(q.min.X - CLR, q.max.X + CLR, ip.Y_FRONT - 1, ip.Y_BACK + 1, Z_BLOCK_BOT - 1, q.max.Z + CLR))
+    return out
+
+
+def block():
+    blk = Pos((X_PL + X_PR) / 2, (ip.Y_FRONT + ip.Y_BACK) / 2, (Z_BLOCK_BOT + Z_SPLIT) / 2) * Box(
+        X_PR - X_PL, ip.Y_BACK - ip.Y_FRONT, Z_SPLIT - Z_BLOCK_BOT)
+    for x, z, r in ip.DURCHGANG.values():
+        blk -= ip.y_hole(x, z, r, ip.Y_FRONT - 1, ip.Y_BACK + 1)
+    for key in POCKETS:
+        for p in b.find(key):
+            blk = offset_cut(blk, p)
+    for c in quader_taschen():
+        blk -= c
+    # Schrauben der Nachbarteile, die in den Block ragen (Senkungen/Köpfe)
+    bb = blk.bounding_box()
+    for label, p in b.sv08_parts():
+        if "screw" not in label or any(k in label for k in b.REMOVED_SHERPA) or ip._old_motor_screw(p):
+            continue
+        q = p.bounding_box()
+        if (q.max.Y < bb.min.Y or q.min.Y > bb.max.Y or q.max.X < bb.min.X or q.min.X > bb.max.X
+                or q.max.Z < bb.min.Z or q.min.Z > bb.max.Z):
+            continue
+        if any((s & blk) and sum(x.volume for x in (s & blk).solids()) > 0.01 for s in p.solids()):
+            blk -= ip.stepped_cylinder(p, CLR)
+    blk -= ip.RINNE                          # Kabelführung
+    return blk
+
+
 def build():
-    body = ip.plate
-    # Verlängerung nach oben über den Motor hinaus, nur der flache Körper (Y_STEP..Y_BACK)
-    # Die Originalkontur der Oberkante (mit Schrägen) wird um dz nach oben verschoben
-    dz = Z_TOP - Z_PLATE_TOP
-    top = [(x, z + dz) for x, z in ((-367.548, -133.913), (-367.348, -133.513), (-353.666, -123.251),
-                                    (-353.366, -123.151), (-319.683, -123.151), (-319.383, -123.251),
-                                    (-305.701, -133.513), (-305.501, -133.913))]
-    pts = [(-367.548, Z_EXT_BOT)] + top + [(-305.501, Z_EXT_BOT)]
-    segs = [("L", *a, *c) for a, c in zip(pts, pts[1:] + pts[:1])]
-    body += ip.slab(segs, ip.Y_STEP, ip.Y_BACK)
-    for x, z, r in ip.MAGNETE.values():           # Magnetbohrungen durch die Verlängerung erhalten
-        body -= ip.y_hole(x, z, r, ip.Y_PAD - 1, ip.Y_BACK + 1)
-    # Motorvertiefung: konvexe Hülle aus Motorkörper und Laschenbögen, ab Motor-Anlagefläche nach hinten
-    body -= extrude(hull_face(sh.MOTOR_FACE_Y), amount=ip.Y_BACK + 1 - sh.MOTOR_FACE_Y, dir=(0, 1, 0))
-    for h in motor_screw_holes():
-        body -= h
-    # Ritzel + Zentrierbund des Motors vor der Anlagefläche
-    body -= Pos(MX, sh.MOTOR_FACE_Y, MZ) * Rot(90, 0, 0) * Cylinder(8.0 + CLR, 8.0, align=MIN)
+    # Oberteil (Install-Plate-Rest mit Motoraufnahme) entfällt, ein neuer Extruderhalter folgt
+    body = block()
     # Goliath-Träger ist direkt mit der Hinterwand verbunden
     body += gtr.traeger
     # Hintere Idler-Stiftaufnahme; Freiräume für 50er-Zahnrad, Ritzel, hinteres Lager und Idler

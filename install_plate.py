@@ -9,7 +9,6 @@ Schichten (y, von vorne nach hinten):
   Auflagen      Y_PAD   .. Y_FRONT   5 kleine Auflagen auf der Vorderseite
   Vorderfläche  Y_FRONT .. Y_STEP    Körperumriss um FRONT_INSET nach innen versetzt
   Körper        Y_STEP  .. Y_BACK    ein Umriss (mit den Aussparungen für das Sliding Panel)
-  Nasen         Y_STEP  .. Y_NOTCH   4 Führungsnasen in den Aussparungen
 
 Bewusst weggelassen gegenüber dem Original: Spritzguss-Rippen und -Schrägen,
 Sitz und Bohrungen des alten Motors, Zahnrad-Aussparung, Oval-Ansatz.
@@ -43,15 +42,6 @@ DURCHGANG = {
     "luftfuehrung": (-352.525, -199.975, 2.00),    # hintere Luftführung
     "schiene_links": (-341.525, -202.175, 2.00),   # M3 von hinten (Sliding Panel)
     "schiene_rechts": (-325.525, -202.175, 2.00),
-}
-MAGNETE = {                                        # Ø4 durchgehend (im Original Hohlraum hinter der Haut)
-    "magnet_ol": (-364.775, -140.675, 2.0), "magnet_or": (-308.275, -140.675, 2.0),
-    "magnet_ul": (-364.275, -194.428, 2.0), "magnet_ur": (-308.775, -194.428, 2.0),
-}
-# Führungsnasen für das Sliding Panel (x0, x1, z0, z1), nur vorne (Y_STEP..Y_NOTCH)
-NASEN = {
-    "nase_ol": (-354.548, -349.025, -166.391, -164.959), "nase_ul": (-354.548, -349.025, -188.391, -186.959),
-    "nase_or": (-324.025, -318.501, -166.391, -164.959), "nase_ur": (-324.025, -318.501, -188.391, -186.959),
 }
 RINNE = Pos(-321.0, (Y_NOTCH + 255.0) / 2, -187.67) * Box(10, 255.0 - Y_NOTCH, 3.10)   # Querrinne hinten (ehem. Tasche 17)
 OVAL_PADS = (-340.8, -331.0, -194.0, -187.5)               # Auflagen im Oval-Bereich entfallen
@@ -141,8 +131,6 @@ def build():
     front_face = Face(body_face.outer_wire().offset_2d(-FRONT_INSET, kind=Kind.ARC))
     plate = extrude(front_face, amount=Y_STEP - Y_FRONT, dir=(0, 1, 0))
     plate += slab(K.BODY, Y_STEP - 0.01, Y_BACK)
-    for x0, x1, z0, z1 in NASEN.values():
-        plate += Pos((x0 + x1) / 2, (Y_STEP + Y_NOTCH) / 2, (z0 + z1) / 2) * Box(x1 - x0 + 0.02, Y_NOTCH - Y_STEP, z1 - z0)
     for pad in K.PADS:
         xs = [s[1] for s in pad]
         zs = [s[2] for s in pad]
@@ -154,8 +142,6 @@ def build():
         plate += slab(pad, Y_PAD, Y_FRONT + 0.01)
 
     for x, z, r in DURCHGANG.values():
-        plate -= y_hole(x, z, r, Y_PAD - 1, Y_BACK + 1)
-    for x, z, r in MAGNETE.values():
         plate -= y_hole(x, z, r, Y_PAD - 1, Y_BACK + 1)
 
     # Funktionstaschen: Schrauben der Nachbarteile, die in die Platte ragen

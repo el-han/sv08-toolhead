@@ -44,5 +44,5 @@ REMOVED_SHERPA = REMOVED_ORIG + [
     "gear_case", "planet_carrier", "cylindrical_gear", "extrusion_gear", "gear_shaft", "handle", "insulated_column",
     "36_step_motor", "motor_knob", "set_screw", "bearing", "M3x16", "knurled_hand_screw", "magnet_ring",
     "wire_clip_plate", "M3x12__hex_socket", "stainless_steel_spring", "flange15_6mm", "ptfe_tube_quick",
-    "plain_washer",
+    "plain_washer", "_magnet",                      # Magnete entfallen mit der Frontverblendung
 ]
