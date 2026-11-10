@@ -119,21 +119,25 @@ def box(x0, x1, y0, y1, z0, z1):
 
 
 def stuetzen():
-    """Vier Stützen im Platinenhalter (x-Mitte, z0, z1): unten links/rechts, oben links auf Höhe der
-    oberen Querverbindung, oben rechts unter dem Rändelkopf."""
-    x0, x1, _, _ = PCB_RECT
-    xl, xr = x0 + POST_INSET + POST / 2, x1 - POST_INSET - POST / 2
+    """Vier Stützen im Platinenhalter (x-Mitte, z0, z1): unten links/rechts, oben links bündig mit der
+    Oberkante des Platinenhalters, oben rechts unter dem Rändelkopf."""
+    x0, x1, _, z1 = PCB_RECT
+    xl = sh.MOTOR_AX[0] - MOTOR_EAR_DX         # links: mittig unter dem Langloch der Motorschraube
+    xr = x1 - POST_INSET - POST / 2
     zt1 = KNOB_BOT - 0.4
     return [(xl, Z_BOT, Z_BOT + POST), (xr, Z_BOT, Z_BOT + POST),
-            (xl, Z_BEAM_TOP, Z_BEAM_TOP + POST), (xr, zt1 - POST, zt1)]
+            (xl, z1 - POST, z1), (xr, zt1 - POST, zt1)]
 
 
 def querverbindungen():
     """Stützen ab Y_BEAM_FRONT bis zur Motorplatte und die waagrechten Verbindungen oben und unten."""
     yw = sh.MOTOR_FACE_Y - MOTOR_PLATE_T
     st = stuetzen()
-    st[3] = (st[3][0], st[3][1], Z_BEAM_TOP + POST)      # rechte obere Stütze bis zur Querverbindung erweitert
-    out = [box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, za, zb) for x, za, zb in st]
+    # links und rechts je eine durchgehende Strebe von unten bis zur oberen Querverbindung
+    # die linke reicht über das Langloch der Motorschraube hinaus
+    z_slot_top = sh.MOTOR_AX[1] + SLOT_HALF + 1.7
+    out = [box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, Z_BOT, zt)
+           for x, zt in ((st[0][0], z_slot_top + 2.0), (st[1][0], Z_BEAM_TOP + POST))]
     xl, xr = st[0][0], st[1][0]
     for za, zb in ((Z_BOT, Z_BOT + POST), (Z_BEAM_TOP, Z_BEAM_TOP + POST)):
         out.append(box(xl - POST / 2, xr + POST / 2, Y_BEAM_FRONT, Y_BEAM_BACK, za, zb))
@@ -185,6 +189,13 @@ def motorplatte():
     return p
 
 
+def motor_langloch(y0, y1):
+    mx, mz = sh.MOTOR_AX
+    xl = mx - MOTOR_EAR_DX
+    return (ycyl(xl, mz - SLOT_HALF, 1.7, y0, y1) + ycyl(xl, mz + SLOT_HALF, 1.7, y0, y1)
+            + Pos(xl, (y0 + y1) / 2, mz) * Box(3.4, y1 - y0, 2 * SLOT_HALF))
+
+
 def gtr_fan_bbox():
     """Lage des (verschobenen, gespiegelten) 2515-Lüfters, aus dem SV08-Modell."""
     fan = next(p for l, p in b.sv08_parts() if "2515_pipe_cooling_fan" in l)
@@ -197,6 +208,7 @@ deckel = build_deckel()
 def build_motorplatte():
     """Motorplatte als eigenes Teil (steht auf dem Hauptträger), mit hinterem Lagersitz und Idler-Stiftaufnahme."""
     p = motorplatte() + scharnier() + querverbindungen()
+    p -= motor_langloch(Y_BEAM_FRONT - 1, sh.MOTOR_FACE_Y + 1)      # Langloch auch durch die linke Strebe
     y0 = PIN_BOSS_Y0
     for c in freiraum():
         cb = c.bounding_box()

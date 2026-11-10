@@ -8,6 +8,8 @@ Sherpa-Koordinaten: Filament läuft in Y bei (x=4.3, z=6.0), Motorachse in Z,
 Motor-Anlagefläche bei z=-7, Motor bei y=+13.85 über der Antriebswelle.
 Abbildung: X_sh -> X, Y_sh -> Z (Motor oben), Z_sh -> -Y (Motor hinten).
 """
+import math
+
 from build123d import Compound, Location, Pos, Rot, import_step
 
 import basis as b
@@ -42,7 +44,11 @@ def to_sv(x, y, z):
     return (X0 + x, Y0 - z, Z0 + y)
 
 
-MOTOR_AX = to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[0::2]   # (x, z)
+# Motor gegenüber dem Original-STEP angehoben: Achsabstand Ritzel-50er-Rad 15,0 mm (Modul 0,5, 10/50 Z.)
+# statt 14,5 mm im CAD-Modell
+CENTER_DIST = 15.0
+MOTOR_DZ = math.sqrt(CENTER_DIST ** 2 - FIL_SH[0] ** 2) - MOTOR_SH_Y
+MOTOR_AX = (to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[0], to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[2] + MOTOR_DZ)   # (x, z)
 MOTOR_FACE_Y = Y0 - MOTOR_FACE_SH
 
 # Motor um die eigene Achse gedreht, von vorne gesehen im Uhrzeigersinn (Ritzel bleibt koaxial)
@@ -94,7 +100,7 @@ def _load():
         flip = FLIP if name in FLIPPED else Location()
         group = [T * flip * s for s in group]
         if name == "motor":
-            group = [MOTOR_TURN * s for s in group]
+            group = [MOTOR_TURN * Pos(0, 0, MOTOR_DZ) * s for s in group]
         shape = group[0] if k == 1 else Compound(group)
         parts.append((name, shape))
     return parts
