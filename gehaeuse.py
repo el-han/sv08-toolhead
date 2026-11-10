@@ -283,13 +283,32 @@ def spanneinsatz_halter():
     c = q.center()
     x0, x1 = q.min.X - 0.6 - INSERT_WALL, q.max.X
     h = Pos(x0, c.Y, c.Z) * Rot(0, 90, 0) * Cylinder(4.8 / 2 + INSERT_WALL, x1 - x0, align=MIN)
-    h -= Pos(q.min.X - 0.6, c.Y, c.Z) * Rot(0, 90, 0) * Cylinder(4.8 / 2, x1 - q.min.X + 1.6, align=MIN)
+    h -= insert_bohrung()
     return h
 
 
-# Filamentführungen und Spanneinsatz-Halter gehören zum Platinenhalter
+def insert_bohrung():
+    q = sh.idler_insert().bounding_box()
+    c = q.center()
+    return Pos(q.min.X - 0.6, c.Y, c.Z) * Rot(0, 90, 0) * Cylinder(4.8 / 2, q.max.X - q.min.X + 1.6, align=MIN)
+
+
+def verstaerkung_oben():
+    """Quader um die Einschmelzmutter des Idlers: von der linken Stütze bis zum Ende der Mutter,
+    von der Rückseite des Platinenhalters bis hinter den Mutterhalter, in der Höhe des Mutterhalters."""
+    q = sh.idler_insert().bounding_box()
+    c = q.center()
+    r = 4.8 / 2 + INSERT_WALL
+    xl = stuetzen()[0][0] + POST / 2 - 0.01
+    return box(xl, q.max.X, Y_LID_FRONT + LID_T - 0.01, c.Y + r, c.Z - r, c.Z + r)
+
+
+# Filamentführungen, Spanneinsatz-Halter und Verstärkung gehören zum Platinenhalter
 fuehrung_oben, fuehrung_unten = build_fuehrungen()
-_d = deckel + fuehrung_oben + fuehrung_unten + spanneinsatz_halter()
+_d = deckel + fuehrung_oben + fuehrung_unten + spanneinsatz_halter() + verstaerkung_oben()
+_d -= insert_bohrung()                                               # Einschmelzmutter des Idlers
+for _x, _z in PCB_INSERTS:                                           # Platineneinsatz
+    _d -= ycyl(_x, _z, INSERT_D / 2, Y_LID_FRONT - 0.1, Y_LID_FRONT + INSERT_L)
 _sz = SHAFT[1]
 _d -= zcyl(GUIDE_D / 2, _sz + UPPER["bot"] - 1, _sz + UPPER["top"] + 1)       # Filamentkanal frei halten
 _d -= zcyl(BORE_D / 2, _sz + UPPER["bore_bot"], _sz + UPPER["top"] + 1)
