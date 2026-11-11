@@ -43,7 +43,9 @@ WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gtr.PCB_DZ, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
-Y_BEAM_FRONT = Y_BEAM_BACK               # Trennfuge Platinenhalter / Motorplatte in den Streben (M3x12)
+# Trennfuge Platinenhalter / Motorplatte in den Streben: M3x12 von der Motorseite endet genau am Ende
+# der 4 mm langen Einschmelzmutter (gelber Teil samt Motorplatte 8 mm)
+Y_BEAM_FRONT = sh.MOTOR_FACE_Y - 12.0 + 4.0
 LUG_W, LUG_T = 7.0, 3.0                 # Befestigungslaschen: Breite, Dicke
 POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
