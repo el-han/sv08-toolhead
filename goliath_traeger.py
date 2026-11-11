@@ -48,10 +48,11 @@ FAN_FACE_X = -323.80                  # gespiegelt: Lüfterfläche bei x=-347.6
 FAN_SHIFT_X = FAN_FACE_X - (-328.70)
 FAN_TOP_ORIG = -165.075                # Oberkante des 2515 im SV08-Modell (ohne Kabel)
 FAN_DZ = Z_BOT - FAN_TOP_ORIG          # Lüfter direkt unter dem Träger
-FAN_HOLES = [(217.55, -167.57 + FAN_DZ), (237.55, -167.57 + FAN_DZ)]   # (y, z) Lochlage am Lüfter
-FAN_HOLE_D, FAN_HOLE_DEPTH = 2.2, 7.0
-EAR_Y = (215.05, 240.05)
-EAR_X = (-329.0, FAN_FACE_X)
+FAN_HOLES = [(217.6, -167.57 + FAN_DZ), (237.6, -167.57 + FAN_DZ)]     # (y, z) obere Lüfterbohrungen
+FAN_BACK_X = 2 * AX_X - (FAN_FACE_X + 15.0)   # Rückseite des gespiegelten 2515 (außen)
+Y_MAIN_WALL = 242.2747                         # Vorderfläche des Hauptträgers (install_plate.Y_FRONT)
+FAN_LUG_WALL = 1.8                            # Wand um die Bohrung in der Lasche
+FAN_LUG_HOLE = 3.4                            # M3 (Lüfterschraube, schneidet ins Lüfterloch Ø2,8)
 
 # 5020-Bauteillüfter: Lage wie bisher (2 mm vor), nicht mehr am Träger befestigt
 FAN5020_SHIFT = (0.0, -2.0, 0.0)
@@ -72,7 +73,32 @@ def build():
     # Untere Platinen-Passschraube ragt von vorne in die Platte (später Gewindeeinsatz)
     plate -= Pos(PCB_SCREW[0], Y_FRONT - 1, PCB_SCREW[1]) * Rot(-90, 0, 0) * Cylinder(PCB_SCREW_R, 6.0, align=MIN)
     # Freiraum für den Goliath selbst (Kühlkörper-Oberseite liegt plan an)
+    plate += luefter_laschen()
+    for y, z in FAN_HOLES:
+        plate -= Pos(X_L - 1, y, z) * Rot(0, 90, 0) * Cylinder(FAN_LUG_HOLE / 2, FAN_BACK_X - X_L + 1.1, align=MIN)
     return plate
+
+
+def luefter_laschen():
+    """Zwei Keile unter dem Träger an der Lüfterrückseite (außen), je um eine obere Lüfterbohrung.
+    Die Innenkante ist um 45° zur Lüftermitte geneigt und liegt tangential an der Wand um die Bohrung,
+    damit möglichst wenig vom Ansaugquerschnitt verdeckt wird; außen reichen die Keile bis zur
+    Vorderkante bzw. bis zum Hauptträger."""
+    from build123d import Polyline, make_face, extrude
+    out = None
+    r = FAN_LUG_HOLE / 2 + FAN_LUG_WALL
+    import math
+    # außen bis zur Vorderkante des Trägers bzw. bis zur Wand des Hauptträgers
+    for (y, z), y_out in zip(FAN_HOLES, (Y_FRONT, Y_MAIN_WALL)):
+        s = 1 if y_out < y else -1                     # Richtung zur Lüftermitte
+        z_bot = z - r
+        h = Z_BOT - z_bot
+        y0 = y + s * r * (math.sqrt(2) - 1)            # 45°-Kante tangential an die Wand um die Bohrung
+        pts = [(y_out, Z_BOT), (y_out, z_bot), (y0, z_bot), (y0 + s * h, Z_BOT)]
+        face = make_face(Polyline(*[(X_L, py, pz) for py, pz in pts], close=True))
+        lug = extrude(face, amount=FAN_BACK_X - 0.1 - X_L, dir=(1, 0, 0))   # 0,1 mm Luft zum Lüfter
+        out = lug if out is None else out + lug
+    return out
 
 
 def place_goliath():

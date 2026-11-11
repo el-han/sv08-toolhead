@@ -25,7 +25,8 @@ INSERT_M3 = (4.4, 5.0, 2.5)
 
 def _axis(d):
     """Rotation, die die +Z-Achse eines Zylinders auf die Richtung d (Einheitsvektor einer Achse) dreht."""
-    return {(0, 1, 0): Rot(-90, 0, 0), (0, -1, 0): Rot(90, 0, 0),
+    return {(1, 0, 0): Rot(0, 90, 0), (-1, 0, 0): Rot(0, -90, 0),
+            (0, 1, 0): Rot(-90, 0, 0), (0, -1, 0): Rot(90, 0, 0),
             (0, 0, 1): Rot(0, 0, 0), (0, 0, -1): Rot(180, 0, 0)}[d]
 
 
@@ -65,6 +66,9 @@ def build():
     for i, (x, y) in enumerate(gh.laschen(), 1):
         out.append((f"schraube_M3x8_lasche_{i}", schraube((x, y, gh.Z_BOT + gh.LUG_T), (0, 0, -1), 8)))
         out.append((f"einschmelzmutter_lasche_{i}", einschmelzmutter((x, y, gtr.Z_BOT), (0, 0, 1))))
+    # 2515-Lüfter: 2x M3x12 von außen durch die Keile in die oberen Lüfterbohrungen
+    for i, (y, z) in enumerate(gtr.FAN_HOLES, 1):
+        out.append((f"schraube_M3x12_luefter_{i}", schraube((gtr.X_L, y, z), (1, 0, 0), 12, (5.5, 3.0, 2.8))))
     # Goliath: 4x M2,5x5 von oben (2,6 mm im Gewinde, Kernloch 3,4 mm tief), Kopf in der Senkung des Trägers
     for i, deg in enumerate(gtr.GOL_SCREWS_DEG, 1):
         x = b.AX_X + gtr.GOL_SCREW_R * math.cos(math.radians(deg))
