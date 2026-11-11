@@ -206,7 +206,6 @@ if __name__ == "__main__":
     import extruder_body as eb
     import goliath_carrier as gc
     import housing as hs
-    import install_plate as ip
 
     sv = sv08_placed()
     sp = sherpa_placed()
@@ -218,12 +217,6 @@ if __name__ == "__main__":
         run_check = True
 
     if run_check:
-        # baseline: overlaps that already exist in the source models
-        base_plate = {}
-        for label, p in cm.sv08_parts():
-            if "xtruder_install_plate" not in label:
-                base_plate[id(p)] = overlap(ip.orig, p)
-        base_sherpa = {}
         bad = False
         import fasteners as fs
         others = [(n, t, p) for n, t, p in sv + sp] + [(n, "fastener", p) for n, p in fs.parts]
@@ -234,10 +227,6 @@ if __name__ == "__main__":
                 if oname == "Goliath" and "screw" in n:     # thread engagement in the Goliath core hole
                     continue
                 v = overlap(obj, p)
-                if oname == "MainBody":
-                    v -= base_sherpa.get(id(p), 0)
-                    if t == "original":
-                        v -= next((base_plate[id(q)] for l, q in cm.sv08_parts() if q is p), 0)
                 if v > 0.05 or v != v:
                     bad = True
                     pb = p.bounding_box()

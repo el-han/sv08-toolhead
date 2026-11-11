@@ -39,7 +39,7 @@ Y_FRONT = 214.2                       # up to the PCB (PCB holder at y=214)
 # PCB raised so that the lower shoulder screw sits in the middle of the carrier
 PCB_DZ = (Z_BOT + Z_TOP) / 2 - (-153.2)
 PCB_SCREW, PCB_SCREW_R = (-336.5, -153.2 + PCB_DZ), 2.0
-Y_WALL = 242.8747                     # install_plate.Y_STEP (reaches into the wall)
+Y_WALL = 242.8747                     # reaches 0.6 mm into the main body (front face y=242.27)
 
 # 2515 hotend fan: dimensions as on the original (+X) side; fan and wedges are then mirrored
 # about the filament axis (x=AX_X) to the -X side
@@ -50,7 +50,7 @@ FAN_TOP_ORIG = -165.075               # top of the 2515 in the SV08 model (witho
 FAN_DZ = Z_BOT - FAN_TOP_ORIG         # fan directly below the carrier
 FAN_HOLES = [(217.6, -167.57 + FAN_DZ), (237.6, -167.57 + FAN_DZ)]     # (y, z) upper fan holes
 FAN_BACK_X = 2 * AX_X - (FAN_FACE_X + 15.0)   # back side of the mirrored 2515 (outside)
-Y_MAIN_WALL = 242.2747                # front face of the main body (install_plate.Y_FRONT)
+Y_MAIN_WALL = 242.2747                # front face of the main body
 FAN_LUG_WALL = 1.8                    # wall around the hole in the wedge
 FAN_LUG_HOLE = 3.4                    # M3 (fan screw, cuts its thread into the Ø2.8 fan hole)
 

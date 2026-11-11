@@ -12,7 +12,6 @@ Hole dimensions as in the original Sherpa (measured in the STEP):
   idler pin    Ø3.3  front y 219.1..221.25 (PCB holder), rear y 235.35..238.75 (boss on the motor plate)
   thumbscrew insert M3x5x4  Ø4.8 along X, x -333.4..-328.8 (thumbscrew from +X through the idler arm)
 """
-import math
 from functools import lru_cache
 
 from build123d import Align, Box, Cylinder, Pos, Rot, export_step
@@ -42,7 +41,6 @@ BEARING_FRONT = 243.35                      # front edge of the rear bearing sea
 WALL = 1.5                                  # wall thickness of the bosses
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gc.PCB_DZ, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0          # lower edge of the thumbscrew knob (Ø12)
-Y_BEAM_BACK = 243.25 - 3.0 - 0.8            # 0.8 mm in front of the rim of the 50t gear (3 mm thick)
 # parting line PCB holder / motor plate in the posts: the M3x12 from the motor side ends exactly at the
 # end of the 4 mm heat-set insert (yellow part including the motor plate 8 mm)
 Y_BEAM_FRONT = sh.MOTOR_FACE_Y - 12.0 + 4.0
@@ -55,7 +53,7 @@ POST_TOP_L = -126.2 + gc.PCB_DZ             # top of the left post (previous top
 PCB_RECT = (*X_FULL, -161.2 + gc.PCB_DZ, sh.idler_insert().bounding_box().center().Z + 4.8 / 2 + 1.5)
 # motor plate
 MOTOR_PLATE_T = 2.0
-MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5      # hole distance of the motor ears, ear radius
+MOTOR_EAR_DX = 21.92                        # hole distance of the motor ears
 MOTOR_BOSS_R = 8.0 + CLR                    # pinion + centring collar
 SLOT_HALF = 1.5                             # half slot length (centre travel ±1.5 mm)
 # rear idler pin seat
@@ -220,19 +218,6 @@ def motor_plate_base():
     p -= ycyl(xl, mz - SLOT_HALF, 1.7, y0 - 1, y1 + 1) + ycyl(xl, mz + SLOT_HALF, 1.7, y0 - 1, y1 + 1)
     p -= Pos(xl, y0 + MOTOR_PLATE_T / 2, mz) * Box(3.4, MOTOR_PLATE_T + 2, 2 * SLOT_HALF)
     return p
-
-
-def motor_slot(y0, y1):
-    mx, mz = sh.MOTOR_AX
-    xl = mx - MOTOR_EAR_DX
-    return (ycyl(xl, mz - SLOT_HALF, 1.7, y0, y1) + ycyl(xl, mz + SLOT_HALF, 1.7, y0, y1)
-            + Pos(xl, (y0 + y1) / 2, mz) * Box(3.4, y1 - y0, 2 * SLOT_HALF))
-
-
-def fan_bbox():
-    """Position of the (shifted, mirrored) 2515 fan, from the SV08 model."""
-    fan = next(p for l, p in cm.sv08_parts() if "2515_pipe_cooling_fan" in l)
-    return (Pos(gc.FAN_SHIFT_X, 0, gc.FAN_DZ) * fan).mirror(gc.FAN_MIRROR).bounding_box()
 
 
 pcb_holder = build_pcb_holder_base()

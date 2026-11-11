@@ -50,10 +50,6 @@ MOTOR_DZ = math.sqrt(CENTER_DIST ** 2 - FIL_SH[0] ** 2) - MOTOR_SH_Y
 MOTOR_AX = (to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[0], to_sv(FIL_SH[0], MOTOR_SH_Y, 0)[2] + MOTOR_DZ)   # (x, z)
 MOTOR_FACE_Y = Y0 - MOTOR_FACE_SH
 
-# Motor rotated about its own axis, clockwise seen from the front (pinion stays coaxial)
-MOTOR_ROT = 0.0
-MOTOR_TURN = Pos(MOTOR_AX[0], 0, MOTOR_AX[1]) * Rot(0, MOTOR_ROT, 0) * Pos(-MOTOR_AX[0], 0, -MOTOR_AX[1])
-
 # Parts identified by volume (labels in the STEP are partly duplicated)
 _NAMES = {
     5622: "housing_core", 821: "housing_front", 952: "housing_front_k", 2517: "housing_rear",
@@ -99,7 +95,7 @@ def _load():
         flip = FLIP if name in FLIPPED else Location()
         group = [T * flip * s for s in group]
         if name == "motor":
-            group = [MOTOR_TURN * Pos(0, 0, MOTOR_DZ) * s for s in group]
+            group = [Pos(0, 0, MOTOR_DZ) * s for s in group]
         shape = group[0] if k == 1 else Compound(group)
         parts.append((name, shape))
     return parts

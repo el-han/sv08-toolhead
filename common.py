@@ -2,7 +2,6 @@
 
 Coordinates = coordinate system of the Sovol STEP assembly (mm).
 """
-import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -16,11 +15,6 @@ OUT = ROOT / "out"
 
 AX_X, AX_Y = -335.70, 225.05     # filament axis / nozzle (original, unchanged)
 ORIG_NOZZLE_Z = -224.07          # original nozzle tip (unchanged)
-
-
-def short(label):
-    m = re.findall(r"[A-Za-z0-9][A-Za-z0-9_\-]{3,}", label or "")
-    return (m[-1] if m else label)[:40]
 
 
 @lru_cache(None)
