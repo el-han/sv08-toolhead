@@ -53,7 +53,7 @@ def build():
     # Platinenhalter <-> Motorplatte: Mutter in der Stütze, Schraube von der Motorseite
     for i, (x, z) in enumerate(gh.schrauben(), 1):
         out.append((f"einschmelzmutter_stuetze_{i}", einschmelzmutter((x, yb, z), (0, -1, 0))))
-        out.append((f"schraube_M3x14_stuetze_{i}", schraube((x, yw, z), (0, -1, 0), 14)))
+        out.append((f"schraube_M3x12_stuetze_{i}", schraube((x, yw, z), (0, -1, 0), 12)))
     # Motor: 2x M3x6 von vorne durch die Motorplatte (links durch das Langloch)
     mx, mz = sh.MOTOR_AX
     for side, dx in (("rechts", gh.MOTOR_EAR_DX), ("links", -gh.MOTOR_EAR_DX)):
