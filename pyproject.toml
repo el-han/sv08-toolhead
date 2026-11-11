@@ -1,7 +1,7 @@
 [project]
 name = "sv08-toolhead"
 version = "0.1.0"
-description = "Goliath-Hotend-Umbau für den Sovol SV08 (build123d)"
+description = "Sherpa Mini + Goliath hotend conversion for the Sovol SV08 (build123d)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "build123d==0.13.0",

@@ -1,9 +1,9 @@
-"""Kollisionsprüfung, Renderbilder und Gesamt-STEP für den Sherpa-/Goliath-Umbau.
+"""Collision check, render images and complete STEP for the Sherpa/Goliath conversion.
 
-Aufruf:  .venv/bin/python check.py [--render | --nocheck] [--png]
-  --render   Prüfung + Teile-STEP/STL + out/check_assembly.step
-  --nocheck  wie --render, aber ohne Kollisionsprüfung
-  --png      zusätzlich matplotlib-Ansichten (langsam)
+Usage:  .venv/bin/python check.py [--render | --nocheck] [--png]
+  --render   check + part STEPs + out/check_assembly.step
+  --nocheck  like --render, but without the collision check
+  --png      additional matplotlib views (slow)
 """
 import sys
 
@@ -13,18 +13,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from build123d import Box, Compound, Location, Pos, export_step
 
-import basis as b
+import common as cm
 import sherpa as sh
 
 FRONT5020 = ["5020_turbofan", "air_duct_5020", "cover_plate3", "M2_5X8"]
 FAN2515 = "2515_pipe_cooling_fan"
-FIL_R = 0.95                       # Filament Ø1,75 mit etwas Luft (Führung Ø2,1)
+FIL_R = 0.95                       # filament Ø1.75 with some clearance (guide Ø2.1)
 
 
-# Entfallene SV08-Schrauben, über Lage identifiziert (x, z, Achse):
-#   alte Motorschrauben (Y) und M3x12 der alten Kabelklemme (X, ragen seitlich in den Sherpa)
+# Dropped SV08 screws, identified by position (x, z, axis):
+#   old motor screws (Y) and M3x12 of the old cable clamp (X, reach into the Sherpa from the side)
 REMOVED_SCREWS = [(-322.65, -133.35, "Y"), (-361.35, -153.95, "Y"), (-347.2, -129.65, "X"),
-                  (-360.85, -166.95, "Y")]   # M2,5 des 5020 (Lüfter nicht mehr am Träger befestigt)
+                  (-360.85, -166.95, "Y")]   # M2.5 of the 5020 (fan no longer attached to the carrier)
 
 
 def removed_screw(label, p):
@@ -38,33 +38,33 @@ def removed_screw(label, p):
 
 
 def sv08_placed():
-    """Verbleibende SV08-Teile an ihrer neuen Lage: (name, tag, shape)."""
-    import goliath_traeger as gtr
+    """Remaining SV08 parts at their new position: (name, tag, shape)."""
+    import goliath_carrier as gc
     out = []
-    for label, p in b.sv08_parts():
+    for label, p in cm.sv08_parts():
         z = p.bounding_box().center().Z
-        if "M3x12" in label and z < -196:                 # Sensor-/Deflektorschrauben bleiben
+        if "M3x12" in label and z < -196:                 # sensor/deflector screws stay
             out.append((label, "original", p))
             continue
-        if "shoulder_screws" in label and "4xM3" in label:  # Platinen-Passschrauben (mit der Platine angehoben)
-            out.append((label, "Platine hoch", Pos(0, 0, gtr.PCB_DZ) * p))
+        if "shoulder_screws" in label and "4xM3" in label:  # PCB shoulder screws (raised with the PCB)
+            out.append((label, "PCB raised", Pos(0, 0, gc.PCB_DZ) * p))
             continue
-        if "adapter_plate" in label:                       # Platinen (Adapterplatten) angehoben
-            out.append((label, "Platine hoch", Pos(0, 0, gtr.PCB_DZ) * p))
+        if "adapter_plate" in label:                       # PCBs (adapter plates) raised
+            out.append((label, "PCB raised", Pos(0, 0, gc.PCB_DZ) * p))
             continue
-        if any(k in label for k in b.REMOVED_SHERPA):
+        if any(k in label for k in cm.REMOVED_SHERPA):
             continue
         if removed_screw(label, p):
             continue
-        if "proximity_switch" in label:                    # Kabel der Eddy-Sonde entfernen
+        if "proximity_switch" in label:                    # remove the cable of the Eddy probe
             p = p - Pos(-352.5, 239.8, -182.5) * Box(3.4, 3.4, 15.9)
         if any(k in label for k in FRONT5020):
-            p, tag = Pos(*gtr.FAN5020_SHIFT) * p, "5020 vor"
+            p, tag = Pos(*gc.FAN5020_SHIFT) * p, "5020 forward"
         elif FAN2515 in label:
-            # Kabel (4 dünne Litzen nach oben) entfernen, verschieben und auf die -X-Seite spiegeln
+            # remove the cable (4 thin wires upwards), shift and mirror to the -X side
             p = Compound([p.solids()[0], p.solids()[1] - Pos(-323.65, 234.75, -155.0) * Box(1.2, 1.6, 20.2)])
-            p = (Pos(gtr.FAN_SHIFT_X, 0, gtr.FAN_DZ) * p).mirror(gtr.FAN_MIRROR)
-            tag = "2515 gespiegelt"
+            p = (Pos(gc.FAN_SHIFT_X, 0, gc.FAN_DZ) * p).mirror(gc.FAN_MIRROR)
+            tag = "2515 mirrored"
         else:
             tag = "original"
         out.append((label, tag, p))
@@ -73,7 +73,7 @@ def sv08_placed():
 
 def sherpa_placed():
     return ([(f"sherpa_{n}", "Sherpa", p) for n, p in sh.parts if n not in sh.UNUSED]
-            + [("sherpa_einschmelzmutter_idler", "Sherpa", sh.idler_insert())])
+            + [("sherpa_heat_insert_idler", "Sherpa", sh.idler_insert())])
 
 
 def overlap(a, c):
@@ -116,12 +116,12 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
     fig.savefig(fname, dpi=110)
 
 
-# ---------------------------------------------------------------- Baum für check_assembly.step
-NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Deckel": (0.20, 0.55, 0.80), "Motorplatte": (0.85, 0.75, 0.20), "Fuehrung": (0.90, 0.30, 0.30), "Goliath_Traeger": (0.15, 0.40, 0.85)}
-SILBER, GOLD = (0.80, 0.80, 0.82), (0.85, 0.75, 0.25)   # Schrauben / Einschmelzmuttern
-SHERPA_COLORS = [("einschmelzmutter", GOLD), ("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
-                 ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
-                 ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
+# ---------------------------------------------------------------- tree for check_assembly.step
+NEW_COLORS = {"MainBody": (0.15, 0.65, 0.35), "PcbHolder": (0.20, 0.55, 0.80), "MotorPlate": (0.85, 0.75, 0.20)}
+SILVER, GOLD = (0.80, 0.80, 0.82), (0.85, 0.75, 0.25)   # screws / heat-set inserts
+SHERPA_COLORS = [("heat_insert", GOLD), ("motor", (0.25, 0.25, 0.28)), ("gear_50t", (0.80, 0.65, 0.25)),
+                 ("drive_gear", (0.80, 0.65, 0.25)), ("idler_gear", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)),
+                 ("bearing", (0.75, 0.75, 0.78)), ("shaft", (0.60, 0.60, 0.62)), ("thumbscrew", (0.10, 0.10, 0.10))]
 SV08_COLORS = [("turbofan", (0.12, 0.12, 0.12)), ("cooling_fan", (0.12, 0.12, 0.12)), ("duct", (0.55, 0.75, 0.90)),
                ("deflector", (0.55, 0.75, 0.90)), ("cover_plate", (0.55, 0.75, 0.90)), ("adapter_plate", (0.20, 0.45, 0.20)),
                ("proximity", (0.85, 0.45, 0.10)), ("sliding", (0.55, 0.55, 0.60)), ("MGN", (0.70, 0.70, 0.72)),
@@ -133,24 +133,24 @@ def _named(shape, name, rgb):
     s = shape.moved(Location()) if hasattr(shape, "moved") else shape
     s.label = name
     s.color = Color(*rgb)
-    for i, c in enumerate(getattr(s, "children", ()) or ()):   # mehrteilige Teile (Lager)
+    for i, c in enumerate(getattr(s, "children", ()) or ()):   # multi-solid parts (bearings)
         c.color = Color(*rgb)
         c.label = f"{name}_{i + 1}"
     return s
 
 
 NAME_OVERRIDES = [
-    ("3x8_4xM3", "passschraube_M3x8_platinen"), ("2_5x5xM2", "passschraube_M2_5x5"),
-    ("plain_washer", "unterlegscheibe"), ("proximity_switch", "induktivsensor_H2N"),
-    ("MGN12H", "MGN12H_wagen"), ("2515_pipe_cooling_fan", "luefter_2515_hotend"),
-    ("3010_turbofan", "luefter_3010_turbo"), ("5020_turbofan", "luefter_5020_bauteil"),
-    ("ptfe_tube_quick_coupling", "ptfe_schnellverbinder"), ("quick_plug_adapter", "ptfe_klammer"),
-    ("length16mm", "ptfe_schlauch_16mm"), ("inner_diameter2mm_ptfe", "ptfe_schlauch"),
+    ("3x8_4xM3", "shoulder_screw_M3x8_pcb"), ("2_5x5xM2", "shoulder_screw_M2_5x5"),
+    ("plain_washer", "washer"), ("proximity_switch", "eddy_probe"),
+    ("MGN12H", "MGN12H_carriage"), ("2515_pipe_cooling_fan", "fan_2515_hotend"),
+    ("3010_turbofan", "fan_3010_turbo"), ("5020_turbofan", "fan_5020_part_cooling"),
+    ("ptfe_tube_quick_coupling", "ptfe_quick_coupling"), ("quick_plug_adapter", "ptfe_clip"),
+    ("length16mm", "ptfe_tube_16mm"), ("inner_diameter2mm_ptfe", "ptfe_tube"),
 ]
 
 
 def nice_name(label):
-    """Lesbarer Name aus den teils verstümmelten Sovol-Labels."""
+    """Readable name from the partly garbled Sovol labels."""
     import re
     a = re.sub(r"[^ -~]", "", label or "")
     low = a.lower()
@@ -159,15 +159,15 @@ def nice_name(label):
             return name
     m = re.search(r"M\d(?:_\d)?[xX]\d+", a)
     if m and "screw" in low:
-        kind = ("senkkopf" if "countersunk" in low else "passschraube" if "shoulder" in low
-                else "madenschraube" if "set_screw" in low else "zylinderkopf")
-        return f"schraube_{m.group(0).replace('X', 'x')}_{kind}"
+        kind = ("countersunk" if "countersunk" in low else "shoulder" if "shoulder" in low
+                else "set_screw" if "set_screw" in low else "socket_head")
+        return f"screw_{m.group(0).replace('X', 'x')}_{kind}"
     s = re.sub(r"^[A-Z0-9]+-[0-9]+-[a-z]_", "", a)
     s = re.sub(r"^SV05p", "", s)
     s = re.sub(r"^[^A-Za-z]+", "", s)
     if s.startswith("xtruder"):
         s = "e" + s
-    return s.strip("_")[:40] or "teil"
+    return s.strip("_")[:40] or "part"
 
 
 def _group(name, items):
@@ -176,8 +176,8 @@ def _group(name, items):
     return g
 
 
-def assembly_tree(eb, gtr, sv, sp):
-    """Baugruppe als Baum: Neuteile / Goliath / Sherpa / SV08 – mit Namen und Farben."""
+def assembly_tree(eb, gc, sv, sp):
+    """Assembly as a tree: new parts / Goliath / Sherpa / fasteners / SV08, with names and colours."""
     def pick(name, table, default):
         return next((c for k, c in table if k.lower() in name.lower()), default)
 
@@ -188,30 +188,29 @@ def assembly_tree(eb, gtr, sv, sp):
             out.append(_named(p, n if seen[n] == 1 else f"{n}_{seen[n]}", c))
         return out
 
-    neu = _group("Neuteile", [_named(eb.body, "Hauptkoerper", NEW_COLORS["Hauptkoerper"]),
-                              _named(gh.deckel, "Deckel", NEW_COLORS["Deckel"]),
-                              _named(gh.motorplatte_teil, "Motorplatte", NEW_COLORS["Motorplatte"])])
-    gol = _group("Goliath", [_named(gtr.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
+    new = _group("NewParts", [_named(eb.body, "MainBody", NEW_COLORS["MainBody"]),
+                              _named(hs.pcb_holder, "PcbHolder", NEW_COLORS["PcbHolder"]),
+                              _named(hs.motor_plate, "MotorPlate", NEW_COLORS["MotorPlate"])])
+    gol = _group("Goliath", [_named(gc.gol, "Goliath_AIR", (0.85, 0.50, 0.15))])
     sher = _group("Sherpa", unique([(n.removeprefix("sherpa_"), p, pick(n, SHERPA_COLORS, (0.60, 0.40, 0.70)))
                                     for n, t, p in sp]))
     sv_items = unique([(nice_name(n), p, pick(n, SV08_COLORS, (0.70, 0.70, 0.70))) for n, t, p in sv])
     sv08 = _group("SV08", sv_items)
-    import verbindungselemente as ve
-    vbe = _group("Verbindungselemente", [_named(p, n, GOLD if "mutter" in n else SILBER)
-                                         for n, p in ve.teile])
-    root = _group("SV08_Sherpa_Goliath", [neu, gol, sher, vbe, sv08])
+    import fasteners as fs
+    fst = _group("Fasteners", [_named(p, n, GOLD if "insert" in n else SILVER) for n, p in fs.parts])
+    root = _group("SV08_Sherpa_Goliath", [new, gol, sher, fst, sv08])
     return root
 
 
 if __name__ == "__main__":
     import extruder_body as eb
-    import gehaeuse as gh
-    import goliath_traeger as gtr
+    import goliath_carrier as gc
+    import housing as hs
     import install_plate as ip
 
     sv = sv08_placed()
     sp = sherpa_placed()
-    new = [("Hauptkörper", eb.body), ("Deckel", gh.deckel), ("Motorplatte", gh.motorplatte_teil), ("Goliath", gtr.gol)]
+    new = [("MainBody", eb.body), ("PcbHolder", hs.pcb_holder), ("MotorPlate", hs.motor_plate), ("Goliath", gc.gol)]
     if "--nocheck" in sys.argv:
         sys.argv.append("--render")
         run_check = False
@@ -219,30 +218,30 @@ if __name__ == "__main__":
         run_check = True
 
     if run_check:
-        # Grundlast: Überschneidungen, die schon in den Ausgangsmodellen bestehen
+        # baseline: overlaps that already exist in the source models
         base_plate = {}
-        for label, p in b.sv08_parts():
+        for label, p in cm.sv08_parts():
             if "xtruder_install_plate" not in label:
                 base_plate[id(p)] = overlap(ip.orig, p)
         base_sherpa = {}
         bad = False
-        import verbindungselemente as ve
-        others = [(n, t, p) for n, t, p in sv + sp] + [(n, "Verbindung", p) for n, p in ve.teile]
+        import fasteners as fs
+        others = [(n, t, p) for n, t, p in sv + sp] + [(n, "fastener", p) for n, p in fs.parts]
         for oname, obj in new:
             for n, t, p in others:
-                if "einschmelzmutter" in n:        # Presssitz (Ø5,0 in Ø4,8) ist gewollt
+                if "heat_insert" in n:             # press fit (Ø5.0 in Ø4.8) is intended
                     continue
-                if oname == "Goliath" and "schraube" in n:   # Gewindeeingriff im Kernloch des Goliath
+                if oname == "Goliath" and "screw" in n:     # thread engagement in the Goliath core hole
                     continue
                 v = overlap(obj, p)
-                if oname == "Hauptkörper":
+                if oname == "MainBody":
                     v -= base_sherpa.get(id(p), 0)
                     if t == "original":
-                        v -= next((base_plate[id(q)] for l, q in b.sv08_parts() if q is p), 0)
+                        v -= next((base_plate[id(q)] for l, q in cm.sv08_parts() if q is p), 0)
                 if v > 0.05 or v != v:
                     bad = True
                     pb = p.bounding_box()
-                    print(f"  KOLLISION {oname} <-> {n} ({t}): {v:.2f} mm^3  "
+                    print(f"  COLLISION {oname} <-> {n} ({t}): {v:.2f} mm^3  "
                           f"[{pb.min.X:.0f},{pb.max.X:.0f}]x[{pb.min.Y:.0f},{pb.max.Y:.0f}]x[{pb.min.Z:.0f},{pb.max.Z:.0f}]")
         for i in range(len(new)):
             for j in range(i + 1, len(new)):
@@ -250,11 +249,11 @@ if __name__ == "__main__":
                 print(f"  {new[i][0]} <-> {new[j][0]}: {v:.2f} mm^3")
                 if v > 0.05:
                     bad = True
-        # Filamentweg (Ø1,75 + Luft) vom Goliath-Einlass bis zur Oberkante der oberen Führung muss frei sein
+        # filament path (Ø1.75 + clearance) from the Goliath inlet to the top of the upper guide must be free
         from build123d import Cylinder, Align
-        z_fil0 = gtr.Z_BOT
-        z_fil1 = gh.SHAFT[1] + gh.UPPER["top"]
-        fil = Pos(b.AX_X, b.AX_Y, z_fil0) * Cylinder(FIL_R, z_fil1 - z_fil0,
+        z_fil0 = gc.Z_BOT
+        z_fil1 = hs.SHAFT[1] + hs.UPPER["top"]
+        fil = Pos(cm.AX_X, cm.AX_Y, z_fil0) * Cylinder(FIL_R, z_fil1 - z_fil0,
                                                      align=(Align.CENTER, Align.CENTER, Align.MIN))
         for oname, obj in new:
             if oname == "Goliath":
@@ -262,23 +261,23 @@ if __name__ == "__main__":
             v = overlap(obj, fil)
             if v > 0.001:
                 bad = True
-                print(f"  FILAMENTWEG blockiert durch {oname}: {v:.3f} mm^3")
-        print(f"Düse z={gtr.nozzle_z:.2f} (Original {b.ORIG_NOZZLE_Z}); "
-              f"Motorachse x={sh.MOTOR_AX[0]:.2f} z={sh.MOTOR_AX[1]:.2f}")
-        print("Keine Kollisionen." if not bad else "Siehe Kollisionen oben.")
+                print(f"  FILAMENT PATH blocked by {oname}: {v:.3f} mm^3")
+        print(f"Nozzle z={gc.nozzle_z:.2f} (original {cm.ORIG_NOZZLE_Z}); "
+              f"motor axis x={sh.MOTOR_AX[0]:.2f} z={sh.MOTOR_AX[1]:.2f}")
+        print("No collisions." if not bad else "See collisions above.")
 
     if "--render" in sys.argv:
-        for fname, obj in (("extruder_body_sherpa", eb.body), ("deckel", gh.deckel), ("motorplatte", gh.motorplatte_teil)):
+        for fname, obj in (("extruder_body_sherpa", eb.body), ("pcb_holder", hs.pcb_holder), ("motor_plate", hs.motor_plate)):
             obj.label = fname
-            export_step(obj, str(b.OUT / f"{fname}.step"))
+            export_step(obj, str(cm.OUT / f"{fname}.step"))
         ctx = [(p, "#b0b0b0", 0.30) for n, t, p in sv if -260 < p.bounding_box().center().Z < -90
                and p.bounding_box().size.Y < 120]
         ctx += [(p, "#c060c0", 0.8) for n, t, p in sp]
-        items = ctx + [(gtr.gol, "#d08030", 1.0), (eb.body, "#20a060", 0.9)]
+        items = ctx + [(gc.gol, "#d08030", 1.0), (eb.body, "#20a060", 0.9)]
         if "--png" in sys.argv:
-          render(items, str(b.OUT / "ansicht_baugruppe.png"),
-               [(10, -90, "vorne"), (10, 0, "rechts (+X)"), (25, -130, "iso")])
-          render([(eb.body, "#20a060", 1.0)], str(b.OUT / "ansicht_hauptkoerper.png"),
-               [(20, -60, "vorne"), (20, 120, "hinten")])
-        export_step(assembly_tree(eb, gtr, sv, sp), str(b.OUT / "check_assembly.step"))
-        print("check_assembly.step geschrieben")
+            render(items, str(cm.OUT / "view_assembly.png"),
+                   [(10, -90, "front"), (10, 0, "right (+X)"), (25, -130, "iso")])
+            render([(eb.body, "#20a060", 1.0)], str(cm.OUT / "view_main_body.png"),
+                   [(20, -60, "front"), (20, 120, "back")])
+        export_step(assembly_tree(eb, gc, sv, sp), str(cm.OUT / "check_assembly.step"))
+        print("check_assembly.step written")

@@ -1,3 +1,4 @@
+"""Pocket map of the back side of a plate STEP (usage: pocket_map.py plate.step out.png)."""
 import sys, json
 import numpy as np
 import matplotlib
@@ -42,7 +43,7 @@ top = np.nanmax(zb[np.isfinite(zb)])
 rec = np.isfinite(zb) & (zb < top - 0.05)
 from scipy import ndimage
 lab0, n0 = ndimage.label(rec)
-# große Regionen nach Tiefenstufen aufteilen (dominante Ebene vs. Rest)
+# split large regions by depth level (dominant plane vs. rest)
 lab = np.zeros_like(lab0); n = 0
 for k in range(1, n0 + 1):
     m = lab0 == k
@@ -64,7 +65,7 @@ for k in range(1, n + 1):
         lab[m] = 0; continue
     jj, ii = np.nonzero(m)
     regions.append((k, area, zb[m].min(), zb[m].max(), ii.mean(), jj.mean()))
-# Nummerierung von oben nach unten, links nach rechts (Ansicht von hinten: X gespiegelt)
+# numbering from top to bottom, left to right (view from the back: X mirrored)
 regions.sort(key=lambda r: (-round(r[5] * RES / 8), -r[4]))
 fig, ax = plt.subplots(figsize=(11, 16))
 ext = (x0, x0 + W * RES, z0, z0 + H * RES)
@@ -76,7 +77,7 @@ info = []
 for idx, (k, area, ymin, ymax, ci, cj) in enumerate(regions, 1):
     col[lab == k] = cmap((idx - 1) % 20)
     jj, ii = np.nonzero(lab == k)
-    # Beschriftungspunkt: Pixel der Region nahe am Schwerpunkt
+    # label point: pixel of the region close to the centroid
     p = np.argmin((ii - ci) ** 2 + (jj - cj) ** 2)
     X, Z = x0 + (ii[p] + .5) * RES, z0 + (jj[p] + .5) * RES
     ax.annotate(str(idx), (X, Z), ha="center", va="center", fontsize=11, weight="bold",
@@ -84,7 +85,7 @@ for idx, (k, area, ymin, ymax, ci, cj) in enumerate(regions, 1):
     info.append((idx, area, top - ymax, top - ymin, X, Z))
 ax.imshow(col, origin="lower", extent=ext)
 ax.invert_xaxis(); ax.set_xlabel("x [mm]"); ax.set_ylabel("z [mm]")
-ax.set_title("Rückseite (Blick von hinten): nicht auf Oberfläche erhöhte Flächen\ngrau = plan, weiß = Durchbruch/außen")
+ax.set_title("Back side (view from the back): areas below the surface\ngrey = flat, white = through/outside")
 fig.savefig(sys.argv[2], dpi=110, bbox_inches="tight")
 for r in info:
-    print(f"{r[0]:3d}  Fläche {r[1]:7.1f} mm²  Tiefe {r[2]:.2f}..{r[3]:.2f} mm  bei x={r[4]:.1f} z={r[5]:.1f}")
+    print(f"{r[0]:3d}  area {r[1]:7.1f} mm²  depth {r[2]:.2f}..{r[3]:.2f} mm  at x={r[4]:.1f} z={r[5]:.1f}")
