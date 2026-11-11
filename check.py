@@ -195,7 +195,10 @@ def assembly_tree(eb, gtr, sv, sp):
                                     for n, t, p in sp]))
     sv_items = unique([(nice_name(n), p, pick(n, SV08_COLORS, (0.70, 0.70, 0.70))) for n, t, p in sv])
     sv08 = _group("SV08", sv_items)
-    root = _group("SV08_Sherpa_Goliath", [neu, gol, sher, sv08])
+    import verbindungselemente as ve
+    vbe = _group("Verbindungselemente", [_named(p, n, (0.85, 0.75, 0.25) if "mutter" in n else (0.25, 0.25, 0.28))
+                                         for n, p in ve.teile])
+    root = _group("SV08_Sherpa_Goliath", [neu, gol, sher, vbe, sv08])
     return root
 
 
@@ -222,7 +225,8 @@ if __name__ == "__main__":
                 base_plate[id(p)] = overlap(ip.orig, p)
         base_sherpa = {}
         bad = False
-        others = [(n, t, p) for n, t, p in sv + sp]
+        import verbindungselemente as ve
+        others = [(n, t, p) for n, t, p in sv + sp] + [(n, "Verbindung", p) for n, p in ve.teile]
         for oname, obj in new:
             for n, t, p in others:
                 if "einschmelzmutter" in n:        # Presssitz (Ø5,0 in Ø4,8) ist gewollt

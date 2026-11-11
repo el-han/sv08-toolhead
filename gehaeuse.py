@@ -43,9 +43,7 @@ WALL = 1.5                          # Wandstärke der Zylinder
 LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gtr.PCB_DZ, INSERT_D / 2 + WALL)]
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
-Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Querverbindungen 2 mm tief
-Z_BEAM_TOP = SHAFT[1] + 6.3 + CLR        # obere Querverbindung über Idler-Arm und Zahnradnabe
-BEAM_H = 5.0                        # Höhe der Querverbindungen
+Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Trennfuge Platinenhalter / Motorplatte in den Streben
 POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
@@ -145,20 +143,12 @@ def schrauben():
 
 
 def querverbindungen():
-    """Stützen ab Y_BEAM_FRONT bis zur Motorplatte und die waagrechten Verbindungen oben und unten."""
+    """Streben ab Y_BEAM_FRONT bis zur Motorplatte, so hoch wie die Stützen im Platinenhalter."""
     yw = sh.MOTOR_FACE_Y - MOTOR_PLATE_T
-    st = stuetzen()
-    # links und rechts je eine durchgehende Strebe von unten bis zur oberen Querverbindung
-    # die linke reicht über das Langloch der Motorschraube hinaus
-    z_slot_top = sh.MOTOR_AX[1] + SLOT_HALF + 1.7
-    out = [box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, Z_BOT, zt)
-           for x, zt in ((st[0][0], z_slot_top + 2.0), (st[1][0], Z_BEAM_TOP + BEAM_H))]
-    xl, xr = st[0][0], st[1][0]
-    for za, zb in ((Z_BOT, Z_BOT + BEAM_H), (Z_BEAM_TOP, Z_BEAM_TOP + BEAM_H)):
-        out.append(box(xl - POST / 2, xr + POST / 2, Y_BEAM_FRONT, Y_BEAM_BACK, za, zb))
-    r = out[0]
-    for o in out[1:]:
-        r += o
+    r = None
+    for x, za, zb in stuetzen():
+        s_ = box(x - POST / 2, x + POST / 2, Y_BEAM_FRONT, yw + 0.01, za, zb)
+        r = s_ if r is None else r + s_
     return r
 
 
@@ -229,7 +219,6 @@ def build_motorplatte():
     p = motorplatte() + scharnier() + querverbindungen()
     # Ring vor der Platte: Lagersitz wie im Original 2,5 mm tief (MR85 ganz versenkt)
     p += ycyl(*SHAFT, 8.2 / 2 + WALL, BEARING_FRONT, sh.MOTOR_FACE_Y - MOTOR_PLATE_T + 0.01)
-    p -= motor_langloch(Y_BEAM_FRONT - 1, sh.MOTOR_FACE_Y + 1)      # Langloch auch durch die linke Strebe
     for x, z in schrauben():                                         # M3-Durchgang zu den Einschmelzmuttern
         p -= ycyl(x, z, 1.7, Y_BEAM_FRONT - 0.1, sh.MOTOR_FACE_Y + 0.1)
     y0 = PIN_BOSS_Y0

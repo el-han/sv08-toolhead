@@ -26,7 +26,7 @@ Z_BOT = Z_TOP - T
 PTFE_D = 4.15
 INLET_D, INLET_DEPTH = 4.6, 1.4       # Zentrierung auf Goliath-Einlass
 
-GOLIATH_ROT = 135.0                   # Heizpatrone zeigt nach +X
+GOLIATH_ROT = 180.0                   # Gewinde des Goliath unter den Trägerlöchern (45°-Raster)
 GOLIATH_TOP = 43.50
 GOLIATH_TIP = -25.75
 GOL_SCREW_R = 8.0
