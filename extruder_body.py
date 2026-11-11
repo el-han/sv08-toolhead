@@ -124,6 +124,8 @@ def build():
     body = block()
     # Goliath-Träger ist direkt mit der Hinterwand verbunden
     body += gtr.traeger
+    for x, y in gh.laschen():                     # Einschmelzmuttern für die Laschen des Platinenhalters
+        body -= Pos(x, y, gtr.Z_BOT - 1) * Cylinder(gh.INSERT_D / 2, gtr.T + 2, align=MIN)
     # Freiräume für 50er-Zahnrad, Ritzel, hinteres Lager und Idler
     for c in gh.freiraum():
         if c.bounding_box().max.Y > gh.Y_LID_BACK:

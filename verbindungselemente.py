@@ -61,6 +61,10 @@ def build():
     # Platinen-Passschrauben: oben Mutter im Platinenhalter, unten im Goliath-Träger
     for i, (x, z) in enumerate(gh.PCB_INSERTS + [gtr.PCB_SCREW], 1):
         out.append((f"einschmelzmutter_platine_{i}", einschmelzmutter((x, gh.Y_LID_FRONT, z), (0, 1, 0))))
+    # Laschen des Platinenhalters: M3x8 von oben, Einschmelzmutter von unten im Goliath-Träger
+    for i, (x, y) in enumerate(gh.laschen(), 1):
+        out.append((f"schraube_M3x8_lasche_{i}", schraube((x, y, gh.Z_BOT + gh.LUG_T), (0, 0, -1), 8)))
+        out.append((f"einschmelzmutter_lasche_{i}", einschmelzmutter((x, y, gtr.Z_BOT), (0, 0, 1))))
     # Goliath: 4x M2,5x5 von oben (2,6 mm im Gewinde, Kernloch 3,4 mm tief), Kopf in der Senkung des Trägers
     for i, deg in enumerate(gtr.GOL_SCREWS_DEG, 1):
         x = b.AX_X + gtr.GOL_SCREW_R * math.cos(math.radians(deg))

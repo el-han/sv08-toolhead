@@ -44,6 +44,7 @@ LID_PADS = [(*SHAFT, 4.1 + WALL), (*PIN, 1.65 + WALL), (-330.2, -128.7 + gtr.PCB
 KNOB_BOT = -126.57 + sh.LIFT - 6.0      # Unterkante des Rändelkopfs (Ø12)
 Y_BEAM_BACK = 243.25 - 3.0 - 0.8       # 0,8 mm vor dem Zahnkranz des 50er-Rads (3 mm stark)
 Y_BEAM_FRONT = Y_BEAM_BACK - 2.0         # Trennfuge Platinenhalter / Motorplatte in den Streben
+LUG_W, LUG_T = 7.0, 3.0                 # Befestigungslaschen: Breite, Dicke
 POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
@@ -152,6 +153,24 @@ def querverbindungen():
     return r
 
 
+def laschen():
+    """Befestigungslaschen (x Lochmitte, y Lochmitte) am Fuß der Stützen, nach außen zur Seitenkante,
+    mittig zwischen PCB-Platte und Motorplatte."""
+    x0, x1, _, _ = PCB_RECT
+    y = (Y_LID_FRONT + LID_T + sh.MOTOR_FACE_Y - MOTOR_PLATE_T) / 2
+    return [(x0 + LUG_W / 2, y), (x1 - LUG_W / 2, y)]          # Halbkreis bis an die Seitenkante
+
+
+def build_laschen():
+    out = None
+    for (xs, _, _), (xh, yh) in zip(stuetzen(), laschen()):
+        lug = box(min(xs, xh), max(xs, xh), yh - LUG_W / 2, yh + LUG_W / 2, Z_BOT, Z_BOT + LUG_T)
+        lug += Pos(xh, yh, Z_BOT) * Cylinder(LUG_W / 2, LUG_T, align=MIN)
+        lug -= Pos(xh, yh, Z_BOT - 1) * Cylinder(1.7, LUG_T + 2, align=MIN)
+        out = lug if out is None else out + lug
+    return out
+
+
 def build_deckel():
     """Platinenhalter: 3 mm Platte in Platinengröße, Verdickungen an Lager, Idlerstift und Platineneinsatz."""
     x0, x1, z0, z1 = PCB_RECT
@@ -169,6 +188,8 @@ def build_deckel():
     # Stützen bis zum Beginn der Querverbindungen (der Rest gehört zur Motorplatte)
     for x, za, zb in stuetzen():
         d += box(x - POST / 2, x + POST / 2, Y_LID_FRONT + LID_T - 0.01, Y_BEAM_FRONT, za, zb)
+    # Befestigungslaschen zum Hauptträger (M3 von oben, Einschmelzmutter im Goliath-Träger)
+    d += build_laschen()
     # Einschmelzmuttern in den Stützen (verschraubt von der Motorseite)
     for x, z in schrauben():
         d -= ycyl(x, z, INSERT_D / 2, Y_BEAM_FRONT - INSERT_L, Y_BEAM_FRONT + 0.1)
