@@ -12,6 +12,7 @@ Bohrungsmaße wie im Original-Sherpa (gemessen im STEP):
   Idler-Stift  Ø3.3  vorne y 219.1..221.25 (Deckel), hinten y 235.35..238.75 (Zylinder am Hauptkörper)
   Spanneinsatz M3x5x4  Ø4.8 in X, x -333.4..-328.8 (Rändelschraube von +X durch den Arm)
 """
+import math
 from functools import lru_cache
 
 from build123d import Align, Box, Cylinder, Pos, Rot, export_step
@@ -48,7 +49,9 @@ BEAM_H = 5.0                        # Höhe der Querverbindungen
 POST = 7.0                          # Querschnitt der Eckstützen (quadratisch)
 LID_T = 3.0                         # Plattenstärke Platinenhalter
 X_FULL = (-367.548, -305.501)                  # volle Breite des Hauptträgers
-PCB_RECT = (*X_FULL, -161.2 + gtr.PCB_DZ, -126.2 + gtr.PCB_DZ)          # Platinenhalter: volle Breite, Höhe der Platinen (x0, x1, z0, z1)
+POST_TOP_L = -126.2 + gtr.PCB_DZ            # Oberkante der linken Stütze (bisherige Halteroberkante, bleibt)
+# Platinenhalter: volle Breite, unten wie die Platinen, oben bündig mit dem Kasten um die Idler-Einschmelzmutter
+PCB_RECT = (*X_FULL, -161.2 + gtr.PCB_DZ, sh.idler_insert().bounding_box().center().Z + 4.8 / 2 + 1.5)
 # Motorplatte
 MOTOR_PLATE_T = 2.0
 MOTOR_EAR_DX, MOTOR_EAR_R = 21.92, 3.5   # Lochabstand der Motorlaschen, Laschenradius
@@ -80,7 +83,7 @@ def idler_sweep():
 
 
 @lru_cache(None)
-def freiraum():
+def freiraum(with_sweep=True):
     """Alles, was aus Rahmen und Deckel ausgespart wird (Liste von Körpern)."""
     sx, sz = SHAFT
     cut = [
@@ -105,7 +108,8 @@ def freiraum():
     # Spanneinsatz für die Rändelschraube (in X, von +X eingesetzt) + Schraubenkanal
     cut.append(Pos(-333.4, 228.8, -126.57 + sh.LIFT) * Rot(0, 90, 0) * Cylinder(4.8 / 2, 7.4, align=MIN))
     cut.append(Pos(-333.4, 228.8, -126.57 + sh.LIFT) * Rot(0, 90, 0) * Cylinder(3.4 / 2, 12.0, align=MIN))
-    cut += idler_sweep()
+    if with_sweep:
+        cut += idler_sweep()
     return tuple(cut)
 
 
@@ -120,10 +124,10 @@ def box(x0, x1, y0, y1, z0, z1):
 
 
 def _post_geo():
-    x0, x1, _, z1 = PCB_RECT
+    x0, x1, _, _ = PCB_RECT
     xl = sh.MOTOR_AX[0] - MOTOR_EAR_DX         # links: mittig unter dem Langloch der Motorschraube
     xr = x1 - (xl - x0)                        # rechts symmetrisch zum Abstand der linken vom Rand
-    return xl, xr, z1, KNOB_BOT - 0.4          # rechts endet die Stütze unter dem Rändelkopf
+    return xl, xr, POST_TOP_L, KNOB_BOT - 0.4          # rechts endet die Stütze unter dem Rändelkopf
 
 
 def stuetzen():
@@ -167,7 +171,8 @@ def build_deckel():
         d += ycyl(x, z, r, Y_LID_FRONT, Y_LID_BACK)
     # Halter endet an der Oberkante des Goliath-Trägers (darunter trägt der Goliath-Träger die Platine)
     d -= Pos(0, 0, Z_BOT) * Box(2000, 2000, 100, align=(Align.CENTER, Align.CENTER, Align.MAX))
-    for c in freiraum():
+    # Freiräume ohne die Idler-Kontur; am Idler werden nur vereinfachte Quader ausgespart (arm_freischnitt)
+    for c in freiraum(with_sweep=False):
         cb = c.bounding_box()
         if cb.min.Y < Y_LID_BACK and cb.max.X > X_L and cb.max.Y > Y_LID_FRONT:
             d -= c
@@ -242,6 +247,9 @@ motorplatte_teil = build_motorplatte()
 # (dort gemessen relativ zur Antriebswelle, z-Versatz zur Wellenachse)
 GUIDE_D, BORE_D = 2.1, 4.2            # Führung / Aufnahme (PTFE bzw. Bohrung)
 GUIDE_WALL = 1.5
+ARM_EDGE = (-330.0, -130.975)            # Punkt auf der Oberkante des Idler-Auslegers vor dem Platineneinsatz
+ARM_SLOPE = 17.8                         # Steigung dieser Kante nach +X (Grad)
+ARM_CLR = 0.5                            # Luft zwischen Platinenhalter und Idler-Arm
 INSERT_WALL = 1.5                        # Wand um die Einschmelzmutter der Rändelschraube
 GEAR_CUT_R = 4.75 + 0.75                 # Antriebs-/Idler-Rad (r4,75) mit Luft
 UPPER = dict(top=18.0, bore_bot=5.32, bot=2.42)     # oben: Bohrung bis 5.32, Führung bis 2.42 über der Welle
@@ -287,6 +295,24 @@ def spanneinsatz_halter():
     return h
 
 
+def arm_freischnitt(teil):
+    """Vereinfachter Freischnitt zum Idler-Arm: je Schwenkstellung der Quader um den Teil des Arms, der
+    dem Bauteil nahe kommt, um ARM_CLR vergrößert und auf den Umriss des Bauteils begrenzt."""
+    tb = teil.bounding_box()
+    k = ARM_CLR
+    zone = box(tb.min.X - k, tb.max.X + k, tb.min.Y - k, tb.max.Y + k, tb.min.Z - k, tb.max.Z + k)
+    out = []
+    for deg in (0.0, 6.0, 12.0):
+        near = (turn(deg) * sh.get("idler_arm_short")[0]) & zone
+        if not (near and near.solids()):
+            continue
+        ab = near.bounding_box()
+        c = box(ab.min.X - ARM_CLR, ab.max.X + ARM_CLR, ab.min.Y - ARM_CLR, ab.max.Y + ARM_CLR,
+                ab.min.Z - ARM_CLR, ab.max.Z + ARM_CLR)
+        out.append(c & box(tb.min.X, tb.max.X, tb.min.Y, tb.max.Y, tb.min.Z, tb.max.Z))
+    return out
+
+
 def insert_bohrung():
     q = sh.idler_insert().bounding_box()
     c = q.center()
@@ -306,6 +332,15 @@ def verstaerkung_oben():
 # Filamentführungen, Spanneinsatz-Halter und Verstärkung gehören zum Platinenhalter
 fuehrung_oben, fuehrung_unten = build_fuehrungen()
 _d = deckel + fuehrung_oben + fuehrung_unten + spanneinsatz_halter() + verstaerkung_oben()
+# vereinfachte Freischnitte zum Idler-Arm an den beiden Zylindern mit Einschmelzmuttern
+# Platineneinsatz: alles unter einer schrägen Linie ARM_CLR über der Oberkante des Idler-Auslegers
+# (steigt mit ARM_SLOPE nach +X an) wird vom Zylinder bis zur PCB-Wand weggeschnitten
+for _x, _z, _r in LID_PADS[2:]:
+    _above = Pos(ARM_EDGE[0], (Y_LID_FRONT + Y_LID_BACK) / 2, ARM_EDGE[1] + ARM_CLR) * Rot(0, -ARM_SLOPE, 0) * Box(
+        40, 40, 20, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    _d -= box(_x - _r - 0.1, _x + _r + 0.1, Y_LID_FRONT + LID_T, Y_LID_BACK + 0.1, _z - _r - 0.1, _z + _r) - _above
+for _c in arm_freischnitt(spanneinsatz_halter()):
+    _d -= _c
 _d -= insert_bohrung()                                               # Einschmelzmutter des Idlers
 for _x, _z in PCB_INSERTS:                                           # Platineneinsatz
     _d -= ycyl(_x, _z, INSERT_D / 2, Y_LID_FRONT - 0.1, Y_LID_FRONT + INSERT_L)
