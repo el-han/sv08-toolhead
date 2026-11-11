@@ -8,7 +8,7 @@ für Sliding Panel und Riemenklemmen (Magnete entfallen); mit Motorvertiefung
 """
 import math
 
-from build123d import (Align, Box, Cylinder, Edge, Face, Pos, Rot, Vector, Wire, extrude,
+from build123d import (Align, Box, Compound, Cylinder, Edge, Face, Pos, Rot, Vector, Wire, extrude,
                        export_step)
 
 import basis as b
@@ -65,14 +65,6 @@ X_PL, X_PR = -367.548, -305.501            # Breite wie bisher (62 mm)
 Z_SPLIT = gtr.Z_TOP                        # Oberkante Goliath-Träger
 Z_BLOCK_BOT = -222.2                       # Unterkante der Eddy-Sonde
 # SV08-Teile, die in der Platte sitzen und eine Aussparung brauchen (Metallaufnahme am Schlitten)
-POCKETS = ["xtruder_sliding_panel"]
-
-
-def offset_cut(body, part, clr=CLR):
-    """Teil mit Luft in X und Z ausschneiden (keine Luft in Y, damit die Rückseite plan bleibt)."""
-    for d in ((0, 0, 0), (clr, 0, 0), (-clr, 0, 0), (0, 0, clr), (0, 0, -clr)):
-        body -= Pos(*d) * part
-    return body
 
 
 def box_cut(x0, x1, y0, y1, z0, z1):
@@ -80,15 +72,25 @@ def box_cut(x0, x1, y0, y1, z0, z1):
 
 
 def quader_taschen():
-    """Quaderförmige Aussparungen: Riemenklemmen seitlich bis nach außen, Luftführung bis zur Unterkante."""
+    """Quaderförmige Aussparungen: Riemenklemmen samt Seitenflansch des Sliding Panels seitlich bis nach
+    außen und durchgehend, Luftführung bis zur Unterkante."""
     out = []
+    blk = box_cut(X_PL, X_PR, ip.Y_FRONT, ip.Y_BACK, Z_BLOCK_BOT, Z_SPLIT)
+    panel = b.find("xtruder_sliding_panel")[0]
+    xm = (X_PL + X_PR) / 2
     for p in b.find("belt_lock_block"):
         q = p.bounding_box()
-        left = q.center().X < (X_PL + X_PR) / 2
-        x0, x1 = (X_PL - 1, q.max.X + CLR) if left else (q.min.X - CLR, X_PR + 1)
-        out.append(box_cut(x0, x1, ip.Y_FRONT - 1, ip.Y_BACK + 1, q.min.Z - CLR, q.max.Z + CLR))   # durchgehend
+        left = q.center().X < xm
+        # Seitenflansch des Sliding Panels auf derselben Seite (steckt in der Platte) mit einschließen
+        half = box_cut(X_PL, xm, ip.Y_FRONT, ip.Y_BACK, Z_BLOCK_BOT, Z_SPLIT) if left else \
+            box_cut(xm, X_PR, ip.Y_FRONT, ip.Y_BACK, Z_BLOCK_BOT, Z_SPLIT)
+        f = panel & half
+        fb = Compound(list(f.solids())).bounding_box() if f and f.solids() else q
+        xa, xb = min(q.min.X, fb.min.X), max(q.max.X, fb.max.X)
+        za, zb = min(q.min.Z, fb.min.Z), max(q.max.Z, fb.max.Z)
+        x0, x1 = (X_PL - 1, xb + CLR) if left else (xa - CLR, X_PR + 1)
+        out.append(box_cut(x0, x1, ip.Y_FRONT - 1, ip.Y_BACK + 1, za - CLR, zb + CLR))   # durchgehend
     # Luftführung: nur der Teil, der in der Platte steckt (darüber tragen die Schrauben)
-    blk = box_cut(X_PL, X_PR, ip.Y_FRONT, ip.Y_BACK, Z_BLOCK_BOT, Z_SPLIT)
     q = (b.find("air_deflector2")[0] & blk).bounding_box()
     out.append(box_cut(q.min.X - CLR, q.max.X + CLR, ip.Y_FRONT - 1, ip.Y_BACK + 1, Z_BLOCK_BOT - 1, q.max.Z + CLR))
     return out
@@ -99,9 +101,6 @@ def block():
         X_PR - X_PL, ip.Y_BACK - ip.Y_FRONT, Z_SPLIT - Z_BLOCK_BOT)
     for x, z, r in ip.DURCHGANG.values():
         blk -= ip.y_hole(x, z, r, ip.Y_FRONT - 1, ip.Y_BACK + 1)
-    for key in POCKETS:
-        for p in b.find(key):
-            blk = offset_cut(blk, p)
     for c in quader_taschen():
         blk -= c
     # Schrauben der Nachbarteile, die in den Block ragen (Senkungen/Köpfe)
@@ -115,7 +114,6 @@ def block():
             continue
         if any((s & blk) and sum(x.volume for x in (s & blk).solids()) > 0.01 for s in p.solids()):
             blk -= ip.stepped_cylinder(p, CLR)
-    blk -= ip.RINNE                          # Kabelführung
     return blk
 
 
