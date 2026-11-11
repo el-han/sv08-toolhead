@@ -36,7 +36,7 @@ IDLER = (-331.4, -136.32 + sh.LIFT)           # Idler-Welle (x, z)             #
 IDLER_SWING = (-2.0, 0.0, 6.0, 12.0)  # Schwenkwinkel des Idlers (Grad, von der Filamentachse weg)
 FIL_D, PTFE_D, PTFE_DEPTH = 2.2, 4.15, 8.0
 
-INSERT_D, INSERT_L = 4.0, 5.5
+INSERT_D, INSERT_L = 4.8, 5.5               # Einschmelzmutter M3x5x4 (wie im Sherpa): Bohrung Ø4,8
 BEARING_FRONT = 243.35                 # Vorderkante des hinteren Lagersitzes (wie Original)
 # Verdickungen um Lagersitz, Stiftbohrung und Platineneinsatz (x, z, r)
 WALL = 1.5                          # Wandstärke der Zylinder

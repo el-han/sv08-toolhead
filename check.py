@@ -118,7 +118,8 @@ def render(items, fname, views, lim=((-372, -300), (190, 262), (-250, -100))):
 
 # ---------------------------------------------------------------- Baum für check_assembly.step
 NEW_COLORS = {"Hauptkoerper": (0.15, 0.65, 0.35), "Deckel": (0.20, 0.55, 0.80), "Motorplatte": (0.85, 0.75, 0.20), "Fuehrung": (0.90, 0.30, 0.30), "Goliath_Traeger": (0.15, 0.40, 0.85)}
-SHERPA_COLORS = [("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
+SILBER, GOLD = (0.80, 0.80, 0.82), (0.85, 0.75, 0.25)   # Schrauben / Einschmelzmuttern
+SHERPA_COLORS = [("einschmelzmutter", GOLD), ("motor", (0.25, 0.25, 0.28)), ("zahnrad", (0.80, 0.65, 0.25)), ("antriebsrad", (0.80, 0.65, 0.25)),
                  ("idler_rad", (0.80, 0.65, 0.25)), ("idler_arm", (0.70, 0.30, 0.75)), ("lager", (0.75, 0.75, 0.78)),
                  ("nadellager", (0.75, 0.75, 0.78)), ("welle", (0.60, 0.60, 0.62)), ("raendel", (0.10, 0.10, 0.10))]
 SV08_COLORS = [("turbofan", (0.12, 0.12, 0.12)), ("cooling_fan", (0.12, 0.12, 0.12)), ("duct", (0.55, 0.75, 0.90)),
@@ -196,7 +197,7 @@ def assembly_tree(eb, gtr, sv, sp):
     sv_items = unique([(nice_name(n), p, pick(n, SV08_COLORS, (0.70, 0.70, 0.70))) for n, t, p in sv])
     sv08 = _group("SV08", sv_items)
     import verbindungselemente as ve
-    vbe = _group("Verbindungselemente", [_named(p, n, (0.85, 0.75, 0.25) if "mutter" in n else (0.25, 0.25, 0.28))
+    vbe = _group("Verbindungselemente", [_named(p, n, GOLD if "mutter" in n else SILBER)
                                          for n, p in ve.teile])
     root = _group("SV08_Sherpa_Goliath", [neu, gol, sher, vbe, sv08])
     return root
@@ -230,6 +231,8 @@ if __name__ == "__main__":
         for oname, obj in new:
             for n, t, p in others:
                 if "einschmelzmutter" in n:        # Presssitz (Ø5,0 in Ø4,8) ist gewollt
+                    continue
+                if oname == "Goliath" and "schraube" in n:   # Gewindeeingriff im Kernloch des Goliath
                     continue
                 v = overlap(obj, p)
                 if oname == "Hauptkörper":
