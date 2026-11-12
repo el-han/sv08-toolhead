@@ -78,6 +78,13 @@ class HousingLayout:
     POST_PARTING_Y = SHERPA.motor_face_y - 12.0 + 4.0
     LEFT_POST_TOP = -126.2 + GOLIATH_CARRIER.PCB_RAISE    # previous top of the holder, kept
 
+    # fan duct mounting: the side walls of the fan duct reach back past the PCB holder (which is narrower by
+    # wall + clearance); one M3 from each side through the side wall into an insert in the PCB holder front wall
+    COVER_SIDE_WALL = 2.0
+    COVER_CLEARANCE = 0.2               # the screws pull the side walls against the holder
+    COVER_SCREW_Z = -136.0
+    COVER_INSERT_WALL = 1.5
+
     # mounting lugs (PCB holder -> main body)
     LUG_WIDTH, LUG_THICKNESS = 7.0, 3.0
 
@@ -98,7 +105,26 @@ class HousingLayout:
     def pcb_plate(self) -> Rect:
         """PCB holder plate: full width, bottom as the PCBs, top flush with the block around the idler insert."""
         insert_z = SHERPA.idler_insert.bounding_box().center().Z
-        return Rect(FULL_WIDTH, Span(-161.2 + GOLIATH_CARRIER.PCB_RAISE, insert_z + HEAT_INSERT_HOLE / 2 + 1.5))
+        return Rect(self.pcb_plate_x, Span(-161.2 + GOLIATH_CARRIER.PCB_RAISE, insert_z + HEAT_INSERT_HOLE / 2 + 1.5))
+
+    @property
+    def pcb_plate_x(self) -> Span:
+        """Full width minus the fan duct side walls and clearance."""
+        inset = self.COVER_SIDE_WALL + self.COVER_CLEARANCE
+        return Span(FULL_WIDTH.start + inset, FULL_WIDTH.end - inset)
+
+    @property
+    def cover_insert_y(self) -> float:
+        """Axis of the fan duct inserts: insert wall in front of it, behind the PCB plate front."""
+        return self.PCB_PLATE_FRONT_Y + HEAT_INSERT_HOLE / 2 + self.COVER_INSERT_WALL
+
+    @property
+    def cover_block_back_y(self) -> float:
+        return self.cover_insert_y + HEAT_INSERT_HOLE / 2 + self.COVER_INSERT_WALL
+
+    def cover_inserts(self) -> list[tuple[float, int]]:
+        """(outer face x of the PCB holder, direction into the holder) left and right."""
+        return [(self.pcb_plate_x.start, 1), (self.pcb_plate_x.end, -1)]
 
     def idler_swing(self, degrees: float):
         """Idler position; positive = clockwise seen from the front (idler towards +X)."""
@@ -289,6 +315,22 @@ class PcbHolder:
         plate -= self.pcb_insert_hole()
         return largest_solid(plate)
 
+    def cover_insert_blocks(self) -> Shape:
+        """Thickened front wall at the outer edges around the fan duct inserts, over the full height of the plate."""
+        layout = self.layout
+        length = HEAT_INSERT_HOLE_DEPTH + layout.COVER_INSERT_WALL
+        return fuse_all([box_between(sorted((x, x + inwards * length)),
+                                     (layout.PCB_PLATE_FRONT_Y, layout.cover_block_back_y),
+                                     (layout.BOTTOM_Z, layout.pcb_plate.z.end))
+                         for x, inwards in layout.cover_inserts()])
+
+    def cover_insert_holes(self) -> list[Shape]:
+        layout = self.layout
+        return [cylinder_along_x((x - inwards * 0.1 if inwards > 0 else x - HEAT_INSERT_HOLE_DEPTH,
+                                  layout.cover_insert_y, layout.COVER_SCREW_Z),
+                                 HEAT_INSERT_HOLE / 2, HEAT_INSERT_HOLE_DEPTH + 0.1)
+                for x, inwards in layout.cover_inserts()]
+
     def insert_holder(self) -> Shape:
         """Cylinder (axis along X) around the thumbscrew insert, position as in the original Sherpa.
         Joins the upper filament guide; the insert is inserted from +X."""
@@ -347,12 +389,15 @@ class PcbHolder:
     def solid(self) -> Shape:
         upper_guide, lower_guide = self.guides.solids
         holder = self.plate() + upper_guide + lower_guide + self.insert_holder() + self.insert_reinforcement()
+        holder += self.cover_insert_blocks()
         holder -= self.pcb_insert_boss_arm_cut()
         for cut in self.arm_clearance_cuts(self.insert_holder()):
             holder -= cut
         # re-cut the holes the additions may have closed
         holder -= self.layout.thumbscrew_insert_hole
         holder -= self.pcb_insert_hole()
+        for hole in self.cover_insert_holes():
+            holder -= hole
         for cut in self.guides.channel_cuts():
             holder -= cut
         # Ø7 as extension of the shaft axis to the front (as in the original)

@@ -7,7 +7,8 @@ Simplified rebuild of the original duct:
   front    wall in front of the fan, full width, with 2 mm side walls back to the PCB holder and the air intake opening; the fan is screwed to it from the front with two
            self-tapping screws ST4.8 into its Ø4.4 ear bores
 
-The front wall ends at the top of the PCB holder. The mounting to the rest of the toolhead is still open.
+The front wall ends at the top of the PCB holder. Mounting: above the Goliath carrier the side walls reach back
+past the (narrower) PCB holder; one M3x6 from each side through them into an insert in the PCB holder.
 Coordinates = Sovol STEP assembly (mm), with the 5020 at its position 2 mm forward of the original.
 """
 from __future__ import annotations
@@ -19,8 +20,8 @@ from build123d import Shape
 from common import FILAMENT_AXIS
 import math
 
-from geometry import XZ, Span, box_between, cylinder_along_y, fuse_all, largest_solid, prism
-from goliath_carrier import FULL_WIDTH
+from geometry import XZ, Span, box_between, cylinder_along_x, cylinder_along_y, fuse_all, largest_solid, prism
+from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
 from housing import HOUSING
 
 
@@ -38,7 +39,7 @@ class FanDuct:
     # duct
     WALL = 1.2
     FRONT_WALL = 2.0
-    SIDE_WALL = 2.0                                            # left and right side walls of the front cover
+    SIDE_WALL = HOUSING.COVER_SIDE_WALL                        # left and right side walls of the front cover
     BOTTOM_Z = -220.7                                          # as the original (nozzle tip at -224.07)
     PLENUM_TOP_Z = -208.7                                      # just below the fan (fan bottom -208.27/-208.66)
     PLENUM_BACK_Y = 214.2                                      # flush with the side walls (PCB holder / carrier front)
@@ -54,6 +55,7 @@ class FanDuct:
 
     # fan screws: self-tapping ST4.8 (DIN 7981), clearance hole in the front wall
     SCREW_HOLE = 5.0
+    MOUNT_SCREW_HOLE = 3.4                                     # M3 clearance in the side wall extensions
 
     @property
     def front_top_z(self) -> float:
@@ -124,6 +126,11 @@ class FanDuct:
         sides = [box_between(x, (self.front_y, HOUSING.PCB_PLATE_FRONT_Y), (self.BOTTOM_Z, self.front_top_z))
                  for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
                            (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
+        # above the Goliath carrier the side walls reach back past the PCB holder, just over the insert blocks
+        sides += [box_between(x, (HOUSING.PCB_PLATE_FRONT_Y - 0.01, HOUSING.cover_block_back_y),
+                              (GOLIATH_CARRIER.TOP_Z + HOUSING.COVER_CLEARANCE, self.front_top_z))
+                  for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
+                            (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
         plenum = box_between(self.plenum_x, (self.front_y, self.PLENUM_BACK_Y), (self.BOTTOM_Z, self.PLENUM_TOP_Z))
         arms = [box_between(x, (self.PLENUM_BACK_Y - self.WALL, back_y), (self.BOTTOM_Z, self.ARM_TOP_Z))
                 for x, back_y, _, _ in self.arms()]
@@ -183,6 +190,9 @@ class FanDuct:
         duct -= cylinder_along_y(self.FAN_AXIS, self.FAN_INTAKE / 2, self.front_y - 1, self.FAN_FRONT_Y + 0.1)
         for ear in self.FAN_EARS:
             duct -= cylinder_along_y(ear, self.SCREW_HOLE / 2, self.front_y - 1, self.FAN_FRONT_Y + 1)
+        for x in (FULL_WIDTH.start - 1, FULL_WIDTH.end - self.SIDE_WALL - 1):
+            duct -= cylinder_along_x((x, HOUSING.cover_insert_y, HOUSING.COVER_SCREW_Z), self.MOUNT_SCREW_HOLE / 2,
+                                     self.SIDE_WALL + 2)
         return largest_solid(duct)
 
 

@@ -136,6 +136,12 @@ class Fasteners:
         # 5020 fan: 2x ST4.8x16 from the front through the fan duct wall into the Ø4.4 ear bores
         for i, ear in enumerate(FAN_DUCT.FAN_EARS, 1):
             parts.append((f"screw_ST4_8x16_fan5020_{i}", self_tapping_screw(_at_y(ear, FAN_DUCT.front_y), BACK, 16)))
+        # fan duct: 2x M3x6 from the sides through the side wall extensions into inserts in the PCB holder
+        for side, (x, inwards), outer_x in zip(("left", "right"), layout.cover_inserts(), (FULL_WIDTH.start, FULL_WIDTH.end)):
+            direction = (inwards, 0, 0)
+            parts.append((f"heat_insert_fan_duct_{side}", heat_insert((x, layout.cover_insert_y, layout.COVER_SCREW_Z), direction)))
+            parts.append((f"screw_M3x6_fan_duct_{side}",
+                          screw((outer_x, layout.cover_insert_y, layout.COVER_SCREW_Z), direction, 6)))
         return parts
 
 
