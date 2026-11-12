@@ -15,6 +15,7 @@ from fan_duct import FAN_DUCT
 from geometry import ALIGN_BOTTOM, XZ
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
 from housing import HOUSING
+from main_body import MAIN_BODY
 from sherpa import SHERPA
 
 Vector3 = tuple[float, float, float]
@@ -142,6 +143,10 @@ class Fasteners:
             parts.append((f"heat_insert_fan_duct_{side}", heat_insert((x, layout.cover_insert_y, layout.COVER_SCREW_Z), direction)))
             parts.append((f"screw_M3x6_fan_duct_{side}",
                           screw((outer_x, layout.cover_insert_y, layout.COVER_SCREW_Z), direction, 6)))
+        # fan duct strip -> main body: M3x6 from the right into the insert block
+        point = (MAIN_BODY.cover_insert_y, MAIN_BODY.COVER_SCREW_Z)
+        parts.append(("heat_insert_fan_duct_main_body", heat_insert((MAIN_BODY.cover_insert_x, *point), (-1, 0, 0))))
+        parts.append(("screw_M3x6_fan_duct_main_body", screw((FULL_WIDTH.end, *point), (-1, 0, 0), 6)))
         return parts
 
 

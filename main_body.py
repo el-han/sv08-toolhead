@@ -16,9 +16,9 @@ from build123d import Box, Compound, Cylinder, Pos, Rot, Shape, Solid
 
 import common
 from common import CLEARANCE
-from geometry import XZ, bounding_boxes_overlap, box_between, cylinder_along_y, cylinder_along_z, fuse_all, largest_solid
+from geometry import XZ, bounding_boxes_overlap, box_between, cylinder_along_x, cylinder_along_y, cylinder_along_z, fuse_all, largest_solid
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER, MAIN_BODY_FRONT_Y
-from housing import HEAT_INSERT_HOLE, HOUSING
+from housing import HEAT_INSERT_HOLE, HEAT_INSERT_HOLE_DEPTH, HOUSING
 
 
 class MainBody:
@@ -37,6 +37,10 @@ class MainBody:
         "rail_left": (XZ(-341.525, -202.175), 2.00),      # M3 from the back (sliding panel)
         "rail_right": (XZ(-325.525, -202.175), 2.00),
     }
+    # fan duct: strip of the right side wall below the sliding panel recess, M3 from the side into an insert in a
+    # block on the front face (below the head of the carriage screw at z -197.4)
+    COVER_SCREW_Z = -201.8
+
     # screws of the old motor (dropped), identified by their position
     OLD_MOTOR_SCREWS = (XZ(-322.65, -133.35), XZ(-361.35, -153.95))
 
@@ -76,6 +80,33 @@ class MainBody:
                                    (self.BOTTOM_Z - 1, duct.max.Z + CLEARANCE)))
         return pockets
 
+    @cached_property
+    def right_pocket_bottom_z(self) -> float:
+        """Lower edge of the recess for the right belt clamp / sliding panel flange."""
+        right = [p.bounding_box() for p in self.pockets() if p.bounding_box().max.X > FULL_WIDTH.end]
+        return right[0].min.Z
+
+    @property
+    def cover_insert_x(self) -> float:
+        """Outer face of the insert block (fan duct side wall + clearance outside of it)."""
+        return FULL_WIDTH.end - HOUSING.COVER_SIDE_WALL - HOUSING.COVER_CLEARANCE
+
+    @property
+    def cover_insert_y(self) -> float:
+        return self.FRONT_Y - HEAT_INSERT_HOLE / 2 - HOUSING.COVER_INSERT_WALL
+
+    @property
+    def cover_block_z(self) -> tuple[float, float]:
+        half = HEAT_INSERT_HOLE / 2 + HOUSING.COVER_INSERT_WALL
+        return (self.COVER_SCREW_Z - half, self.COVER_SCREW_Z + half)
+
+    def cover_insert_block(self) -> Shape:
+        x, wall = self.cover_insert_x, HOUSING.COVER_INSERT_WALL
+        block = box_between((x - HEAT_INSERT_HOLE_DEPTH - wall, x),
+                            (self.cover_insert_y - HEAT_INSERT_HOLE / 2 - wall, self.FRONT_Y + 0.01), self.cover_block_z)
+        return block - cylinder_along_x((x - HEAT_INSERT_HOLE_DEPTH, self.cover_insert_y, self.COVER_SCREW_Z),
+                                        HEAT_INSERT_HOLE / 2, HEAT_INSERT_HOLE_DEPTH + 0.1)
+
     def block(self) -> Shape:
         block = self.block_outline()
         for axis, radius in self.THROUGH_HOLES.values():
@@ -95,6 +126,7 @@ class MainBody:
     @cached_property
     def solid(self) -> Shape:
         body = self.block() + GOLIATH_CARRIER.solid      # the carrier is connected directly to the back wall
+        body += self.cover_insert_block()
         carrier = GOLIATH_CARRIER
         for hole in HOUSING.lug_holes:                   # heat-set inserts for the lugs of the PCB holder
             body -= cylinder_along_z(hole, HEAT_INSERT_HOLE / 2, carrier.BOTTOM_Z - 1, carrier.TOP_Z + 1)

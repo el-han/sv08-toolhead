@@ -8,7 +8,8 @@ Simplified rebuild of the original duct:
            self-tapping screws ST4.8 into its Ø4.4 ear bores
 
 The front wall ends at the top of the PCB holder. Mounting: above the Goliath carrier the side walls reach back
-past the (narrower) PCB holder; one M3x6 from each side through them into an insert in the PCB holder.
+past the (narrower) PCB holder; one M3x6 from each side through them into an insert in the PCB holder. On the
+right a narrow strip below the sliding panel recess reaches back to the main body: one more M3x6 from the side.
 Coordinates = Sovol STEP assembly (mm), with the 5020 at its position 2 mm forward of the original.
 """
 from __future__ import annotations
@@ -23,6 +24,7 @@ import math
 from geometry import XZ, Span, box_between, cylinder_along_x, cylinder_along_y, fuse_all, largest_solid, prism
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
 from housing import HOUSING
+from main_body import MAIN_BODY
 
 
 
@@ -117,7 +119,8 @@ class FanDuct:
             outline = [(outer_x, y0 - c, z0), (outer_x + towards_nozzle * c, y0, z0),
                        (outer_x + towards_nozzle * c, back_y + 1, z0), (outer_x - towards_nozzle, back_y + 1, z0),
                        (outer_x - towards_nozzle, y0 - c, z0)]
-            chamfers.append(prism(outline, (0, 0, 1), self.ARM_TOP_Z - self.BOTTOM_Z + 2))
+            # only up to the arm top: above it the right side wall continues to the main body
+            chamfers.append(prism(outline, (0, 0, 1), self.ARM_TOP_Z - z0))
         return chamfers
 
     def outer(self) -> Shape:
@@ -131,6 +134,10 @@ class FanDuct:
                               (GOLIATH_CARRIER.TOP_Z + HOUSING.COVER_CLEARANCE, self.front_top_z))
                   for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
                             (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
+        # right: straight bar from the arm top up to the sliding panel recess, back to the main body (side screw into its insert block)
+        sides.append(box_between((FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end),
+                                 (HOUSING.PCB_PLATE_FRONT_Y - 0.01, MAIN_BODY.FRONT_Y - HOUSING.COVER_CLEARANCE),
+                                 (self.ARM_TOP_Z - 0.01, MAIN_BODY.right_pocket_bottom_z)))
         plenum = box_between(self.plenum_x, (self.front_y, self.PLENUM_BACK_Y), (self.BOTTOM_Z, self.PLENUM_TOP_Z))
         arms = [box_between(x, (self.PLENUM_BACK_Y - self.WALL, back_y), (self.BOTTOM_Z, self.ARM_TOP_Z))
                 for x, back_y, _, _ in self.arms()]
@@ -193,6 +200,8 @@ class FanDuct:
         for x in (FULL_WIDTH.start - 1, FULL_WIDTH.end - self.SIDE_WALL - 1):
             duct -= cylinder_along_x((x, HOUSING.cover_insert_y, HOUSING.COVER_SCREW_Z), self.MOUNT_SCREW_HOLE / 2,
                                      self.SIDE_WALL + 2)
+        duct -= cylinder_along_x((FULL_WIDTH.end - self.SIDE_WALL - 1, MAIN_BODY.cover_insert_y, MAIN_BODY.COVER_SCREW_Z),
+                                 self.MOUNT_SCREW_HOLE / 2, self.SIDE_WALL + 2)
         return largest_solid(duct)
 
 
