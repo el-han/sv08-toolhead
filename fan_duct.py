@@ -4,7 +4,7 @@ air_deflector_cover_plate3 and the original front cover).
 Simplified rebuild of the original duct:
   plenum   hollow box below the fan outlet, open towards the fan
   arms     two hollow arms left and right of the nozzle, outlet slots in their inner walls facing the nozzle
-  front    wall in front of the fan, full width, with the air intake opening; the fan is screwed to it from the front with two
+  front    wall in front of the fan, full width, with 2 mm side walls back to the PCB holder and the air intake opening; the fan is screwed to it from the front with two
            self-tapping screws ST4.8 into its Ø4.4 ear bores
 
 The front wall ends at the top of the PCB holder. The mounting to the rest of the toolhead is still open.
@@ -17,7 +17,9 @@ from functools import cached_property
 from build123d import Shape
 
 from common import FILAMENT_AXIS
-from geometry import XZ, Span, box_between, cylinder_along_y, fuse_all, largest_solid
+import math
+
+from geometry import XZ, Span, box_between, cylinder_along_y, fuse_all, largest_solid, prism
 from goliath_carrier import FULL_WIDTH
 from housing import HOUSING
 
@@ -36,15 +38,16 @@ class FanDuct:
     # duct
     WALL = 1.2
     FRONT_WALL = 2.0
+    SIDE_WALL = 2.0                                            # left and right side walls of the front cover
     BOTTOM_Z = -220.7                                          # as the original (nozzle tip at -224.07)
     PLENUM_TOP_Z = -208.7                                      # just below the fan (fan bottom -208.27/-208.66)
-    PLENUM_X = Span(-364.4, -308.7)
-    PLENUM_BACK_Y = 213.7
+    PLENUM_BACK_Y = 214.2                                      # flush with the side walls (PCB holder / carrier front)
     ARM_TOP_Z = -211.4
     LEFT_ARM = (Span(-357.4, -347.2), 226.0)                   # x range, back end y
     RIGHT_ARM = (Span(-326.0, -315.7), 232.0)
     OUTLET_HEIGHT = 4.0                                        # slot in the inner arm wall, from the bottom
     OUTLET_FROM_Y = 216.0                                      # slots start behind the plenum
+    ARM_CORNER_CHAMFER = 5.0                                   # 45° at the back outer corner of each arm
 
     # fan screws: self-tapping ST4.8 (DIN 7981), clearance hole in the front wall
     SCREW_HOLE = 5.0
@@ -53,6 +56,11 @@ class FanDuct:
     def front_top_z(self) -> float:
         """The front wall ends at the top of the PCB holder."""
         return HOUSING.pcb_plate.z.end
+
+    @property
+    def plenum_x(self) -> Span:
+        """The plenum reaches the side walls (no gaps)."""
+        return Span(FULL_WIDTH.start + self.SIDE_WALL - 0.01, FULL_WIDTH.end - self.SIDE_WALL + 0.01)
 
     @property
     def front_y(self) -> float:
@@ -65,22 +73,57 @@ class FanDuct:
             inner_x = x.end if towards_nozzle > 0 else x.start
             yield x, back_y, inner_x, towards_nozzle
 
+    def front_chamfer(self, inset: float = 0.0) -> Shape:
+        """Region in front of the 45° plane from the front edge at plenum top down to the bottom
+        (over the whole plenum height); `inset` moves the plane inwards (for the cavity)."""
+        y0 = self.front_y + inset * math.sqrt(2)
+        top, bottom, height = self.PLENUM_TOP_Z, self.BOTTOM_Z, self.PLENUM_TOP_Z - self.BOTTOM_Z
+        x0 = FULL_WIDTH.start - 1
+        outline = [(x0, y0, top), (x0, y0 + height, bottom), (x0, y0 + height, bottom - 1),
+                   (x0, self.front_y - 1, bottom - 1), (x0, self.front_y - 1, top)]
+        return prism(outline, (1, 0, 0), FULL_WIDTH.length + 2)
+
+    def arm_corner_chamfers(self, inset: float = 0.0) -> list[Shape]:
+        """Vertical 45° chamfers at the back outer corner of the arms, where the air turns towards the
+        outlets; `inset` moves the chamfer plane inwards (for the cavity)."""
+        c, shift = self.ARM_CORNER_CHAMFER, inset * math.sqrt(2)
+        chamfers = []
+        for x, back_y, _, towards_nozzle in self.arms():
+            outer_x = x.start if towards_nozzle > 0 else x.end
+            y0 = back_y - shift
+            z0 = self.BOTTOM_Z - 1
+            outline = [(outer_x, y0 - c, z0), (outer_x + towards_nozzle * c, y0, z0),
+                       (outer_x + towards_nozzle * c, back_y + 1, z0), (outer_x - towards_nozzle, back_y + 1, z0),
+                       (outer_x - towards_nozzle, y0 - c, z0)]
+            chamfers.append(prism(outline, (0, 0, 1), self.ARM_TOP_Z - self.BOTTOM_Z + 2))
+        return chamfers
+
     def outer(self) -> Shape:
         front = box_between(FULL_WIDTH, (self.front_y, self.FAN_FRONT_Y), (self.BOTTOM_Z, self.front_top_z))
-        plenum = box_between(self.PLENUM_X, (self.front_y, self.PLENUM_BACK_Y), (self.BOTTOM_Z, self.PLENUM_TOP_Z))
+        # side walls at the left and right edge, back to the PCB holder / carrier front
+        sides = [box_between(x, (self.front_y, HOUSING.PCB_PLATE_FRONT_Y), (self.BOTTOM_Z, self.front_top_z))
+                 for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
+                           (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
+        plenum = box_between(self.plenum_x, (self.front_y, self.PLENUM_BACK_Y), (self.BOTTOM_Z, self.PLENUM_TOP_Z))
         arms = [box_between(x, (self.PLENUM_BACK_Y - self.WALL, back_y), (self.BOTTOM_Z, self.ARM_TOP_Z))
                 for x, back_y, _, _ in self.arms()]
-        return fuse_all([front, plenum, *arms])
+        body = fuse_all([front, *sides, plenum, *arms]) - self.front_chamfer()
+        for chamfer in self.arm_corner_chamfers():
+            body -= chamfer
+        return body
 
     def cavity(self) -> Shape:
         w = self.WALL
-        plenum = box_between((self.PLENUM_X.start + w, self.PLENUM_X.end - w), (self.FAN_FRONT_Y, self.PLENUM_BACK_Y - w),
+        plenum = box_between((self.plenum_x.start + w, self.plenum_x.end - w), (self.FAN_FRONT_Y, self.PLENUM_BACK_Y - w),
                              (self.BOTTOM_Z + w, self.PLENUM_TOP_Z - w))
         arms = [box_between((x.start + w, x.end - w), (self.PLENUM_BACK_Y - w - 0.5, back_y - w),
                             (self.BOTTOM_Z + w, self.ARM_TOP_Z - w))
                 for x, back_y, _, _ in self.arms()]
         outlet = box_between(self.FAN_OUTLET_X, self.FAN_OUTLET_Y, (self.PLENUM_TOP_Z - w - 0.1, self.PLENUM_TOP_Z + 0.1))
-        return fuse_all([plenum, *arms, outlet])
+        cavity = fuse_all([plenum, *arms]) - self.front_chamfer(inset=w)
+        for chamfer in self.arm_corner_chamfers(inset=w):
+            cavity -= chamfer
+        return cavity + outlet
 
     def outlet_slots(self) -> list[Shape]:
         """Slots through the inner arm walls and the bottom edge below them, facing the nozzle."""

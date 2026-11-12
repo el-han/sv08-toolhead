@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, NamedTuple
 
-from build123d import Align, Box, Cylinder, Location, Pos, Rot, Shape, Solid
+from build123d import Align, Box, Cylinder, Location, Polyline, Pos, Rot, Shape, Solid, extrude, make_face
 
 ALIGN_BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)     # cylinder/box starts at its position
 
@@ -76,6 +76,11 @@ def cylinder_along_z(axis: XY, radius: float, z_from: float, z_to: float) -> Sol
 def cylinder_along_x(start: tuple[float, float, float], radius: float, length: float) -> Solid:
     """Cylinder along +X starting at `start` (x, y, z)."""
     return Pos(*start) * Rot(0, 90, 0) * Cylinder(radius, length, align=ALIGN_BOTTOM)
+
+
+def prism(outline: list[tuple[float, float, float]], direction: tuple[float, float, float], length: float) -> Shape:
+    """Closed planar outline (3D points) extruded by `length` along `direction`."""
+    return extrude(make_face(Polyline(*outline, close=True)), amount=length, dir=direction)
 
 
 def rotation_about_y(pivot: XZ, degrees: float) -> Location:
