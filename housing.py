@@ -300,13 +300,13 @@ class PcbHolder:
         return holder - self.layout.thumbscrew_insert_hole
 
     def insert_reinforcement(self) -> Shape:
-        """Block around the thumbscrew insert: from the left post to the end of the insert, from the back of the
+        """Block around the thumbscrew insert: from the outer edge of the left post to the end of the insert, from the back of the
         PCB plate to behind the insert holder, at the height of the insert holder."""
         layout = self.layout
         box = SHERPA.idler_insert.bounding_box()
         center = box.center()
         radius = HEAT_INSERT_HOLE / 2 + self.INSERT_HOLDER_WALL
-        left_x = layout.posts[0].x + layout.POST_SIZE / 2 - 0.01
+        left_x = layout.posts[0].x - layout.POST_SIZE / 2          # up to the outer edge of the left post
         return box_between((left_x, box.max.X),
                            (layout.PCB_PLATE_FRONT_Y + layout.PCB_PLATE_THICKNESS - 0.01, center.Y + radius),
                            (center.Z - radius, center.Z + radius))

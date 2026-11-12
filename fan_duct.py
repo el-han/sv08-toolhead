@@ -42,12 +42,15 @@ class FanDuct:
     BOTTOM_Z = -220.7                                          # as the original (nozzle tip at -224.07)
     PLENUM_TOP_Z = -208.7                                      # just below the fan (fan bottom -208.27/-208.66)
     PLENUM_BACK_Y = 214.2                                      # flush with the side walls (PCB holder / carrier front)
-    ARM_TOP_Z = -211.4
-    LEFT_ARM = (Span(-357.4, -347.2), 226.0)                   # x range, back end y
-    RIGHT_ARM = (Span(-326.0, -315.7), 232.0)
+    ARM_TOP_Z = PLENUM_TOP_Z                                   # arms flush with the plenum top
+    LEFT_ARM_INNER_X, LEFT_ARM_BACK_Y = -347.2, 226.0          # inner wall (towards the nozzle), back end
+    RIGHT_ARM_INNER_X, RIGHT_ARM_BACK_Y = -326.0, 232.0
+    DEFLECTOR_X = -349.0                                       # air deflector: right face of its vertical wall
+    DEFLECTOR_DROP = 6.0                                       # 45° wall: horizontal (= vertical) extent
+    DEFLECTOR_LENGTH = 7.0                                     # length of the sharp top edge
     OUTLET_HEIGHT = 4.0                                        # slot in the inner arm wall, from the bottom
     OUTLET_FROM_Y = 216.0                                      # slots start behind the plenum
-    ARM_CORNER_CHAMFER = 5.0                                   # 45° at the back outer corner of each arm
+    ARM_CORNER_CHAMFER = 0.5                                   # 45° at the back outer corner, fraction of the arm width
 
     # fan screws: self-tapping ST4.8 (DIN 7981), clearance hole in the front wall
     SCREW_HOLE = 5.0
@@ -67,8 +70,10 @@ class FanDuct:
         return self.FAN_FRONT_Y - self.FRONT_WALL
 
     def arms(self):
-        """(x range, back y, inner wall x, direction towards the nozzle) of both arms."""
-        for x, back_y in (self.LEFT_ARM, self.RIGHT_ARM):
+        """(x range, back y, inner wall x, direction towards the nozzle) of both arms; on the outside the arms
+        reach the outer faces of the side walls."""
+        for x, back_y in ((Span(FULL_WIDTH.start, self.LEFT_ARM_INNER_X), self.LEFT_ARM_BACK_Y),
+                          (Span(self.RIGHT_ARM_INNER_X, FULL_WIDTH.end), self.RIGHT_ARM_BACK_Y)):
             towards_nozzle = 1 if x.end < FILAMENT_AXIS.x else -1
             inner_x = x.end if towards_nozzle > 0 else x.start
             yield x, back_y, inner_x, towards_nozzle
@@ -83,12 +88,27 @@ class FanDuct:
                    (x0, self.front_y - 1, bottom - 1), (x0, self.front_y - 1, top)]
         return prism(outline, (1, 0, 0), FULL_WIDTH.length + 2)
 
+    def side_chamfers(self, inset: float = 0.0) -> list[Shape]:
+        """45° chamfers along the lower outer edges (left and right), as large as the front chamfer; `inset`
+        moves the planes inwards (for the cavity)."""
+        top, bottom, height = self.PLENUM_TOP_Z, self.BOTTOM_Z, self.PLENUM_TOP_Z - self.BOTTOM_Z
+        y0 = self.front_y - 1
+        length = max(self.LEFT_ARM_BACK_Y, self.RIGHT_ARM_BACK_Y) + 1 - y0
+        chamfers = []
+        for edge, inwards in ((FULL_WIDTH.start, 1), (FULL_WIDTH.end, -1)):
+            x0 = edge + inwards * inset * math.sqrt(2)
+            outline = [(x0, y0, top), (x0 + inwards * height, y0, bottom), (x0 + inwards * height, y0, bottom - 1),
+                       (edge - inwards, y0, bottom - 1), (edge - inwards, y0, top)]
+            chamfers.append(prism(outline, (0, 1, 0), length))
+        return chamfers
+
     def arm_corner_chamfers(self, inset: float = 0.0) -> list[Shape]:
         """Vertical 45° chamfers at the back outer corner of the arms, where the air turns towards the
         outlets; `inset` moves the chamfer plane inwards (for the cavity)."""
-        c, shift = self.ARM_CORNER_CHAMFER, inset * math.sqrt(2)
+        shift = inset * math.sqrt(2)
         chamfers = []
         for x, back_y, _, towards_nozzle in self.arms():
+            c = self.ARM_CORNER_CHAMFER * x.length
             outer_x = x.start if towards_nozzle > 0 else x.end
             y0 = back_y - shift
             z0 = self.BOTTOM_Z - 1
@@ -108,7 +128,7 @@ class FanDuct:
         arms = [box_between(x, (self.PLENUM_BACK_Y - self.WALL, back_y), (self.BOTTOM_Z, self.ARM_TOP_Z))
                 for x, back_y, _, _ in self.arms()]
         body = fuse_all([front, *sides, plenum, *arms]) - self.front_chamfer()
-        for chamfer in self.arm_corner_chamfers():
+        for chamfer in self.side_chamfers() + self.arm_corner_chamfers():
             body -= chamfer
         return body
 
@@ -121,7 +141,7 @@ class FanDuct:
                 for x, back_y, _, _ in self.arms()]
         outlet = box_between(self.FAN_OUTLET_X, self.FAN_OUTLET_Y, (self.PLENUM_TOP_Z - w - 0.1, self.PLENUM_TOP_Z + 0.1))
         cavity = fuse_all([plenum, *arms]) - self.front_chamfer(inset=w)
-        for chamfer in self.arm_corner_chamfers(inset=w):
+        for chamfer in self.side_chamfers(inset=w) + self.arm_corner_chamfers(inset=w):
             cavity -= chamfer
         return cavity + outlet
 
@@ -134,9 +154,29 @@ class FanDuct:
                                      (self.BOTTOM_Z - 0.5, self.BOTTOM_Z + self.OUTLET_HEIGHT)))
         return slots
 
+    def deflector(self) -> Shape:
+        """Air deflector at the front of the plenum (as in the original, about 1/3 from the left), cross-section:
+        a vertical wall from the plenum top to the floor and from its sharp top edge a 45° wall sloping down to
+        the right. The top edge is DEFLECTOR_LENGTH long (from the inner face of the front chamfer); behind it
+        the deflector drops at 45° to the floor."""
+        w, x, drop = self.WALL, self.DEFLECTOR_X, self.DEFLECTOR_DROP
+        top, floor = self.PLENUM_TOP_Z - w, self.BOTTOM_Z + w - 0.01
+        slope = w * math.sqrt(2)
+        ridge_start = self.front_y + slope + w            # inner face of the front chamfer at the plenum top
+        ridge_end = ridge_start + self.DEFLECTOR_LENGTH
+        height = top - floor
+        y0, y1 = self.front_y, ridge_end + height + 1
+        profile = [(x - w, y0, top), (x + drop, y0, top - drop - w), (x + drop, y0, top - drop - w - slope),
+                   (x, y0, top - slope - w), (x, y0, floor), (x - w, y0, floor)]
+        deflector = prism(profile, (0, 1, 0), y1 - y0)
+        x0, x1 = x - w - 1, x + drop + 1
+        back = prism([(x0, ridge_end - 1, top + 1), (x0, ridge_end + height + 0.1, floor - 0.1),
+                      (x0, y1 + 1, floor - 0.1), (x0, y1 + 1, top + 1)], (1, 0, 0), x1 - x0)
+        return deflector - back - self.front_chamfer()
+
     @cached_property
     def solid(self) -> Shape:
-        duct = self.outer() - self.cavity()
+        duct = self.outer() - self.cavity() + self.deflector()
         for slot in self.outlet_slots():
             duct -= slot
         # air intake of the fan through the front wall
