@@ -41,6 +41,7 @@ class FanDuct:
     # duct
     WALL = 1.2
     FRONT_WALL = 2.0
+    LID = 2.0                                                  # lid at the top, back to the PCB holder
     SIDE_WALL = HOUSING.COVER_SIDE_WALL                        # left and right side walls of the front cover
     BOTTOM_Z = -220.7                                          # as the original (nozzle tip at -224.07)
     PLENUM_TOP_Z = -208.7                                      # just below the fan (fan bottom -208.27/-208.66)
@@ -126,22 +127,25 @@ class FanDuct:
     def outer(self) -> Shape:
         front = box_between(FULL_WIDTH, (self.front_y, self.FAN_FRONT_Y), (self.BOTTOM_Z, self.front_top_z))
         # side walls at the left and right edge, back to the PCB holder / carrier front
-        sides = [box_between(x, (self.front_y, HOUSING.PCB_PLATE_FRONT_Y), (self.BOTTOM_Z, self.front_top_z))
+        sides = [box_between(x, (self.front_y, HOUSING.PCB_PLATE_FRONT_Y - HOUSING.COVER_CLEARANCE), (self.BOTTOM_Z, self.front_top_z))
                  for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
                            (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
         # above the Goliath carrier the side walls reach back past the PCB holder, just over the insert blocks
-        sides += [box_between(x, (HOUSING.PCB_PLATE_FRONT_Y - 0.01, HOUSING.cover_block_back_y),
+        sides += [box_between(x, (HOUSING.PCB_PLATE_FRONT_Y - HOUSING.COVER_CLEARANCE - 0.01, HOUSING.cover_block_back_y),
                               (GOLIATH_CARRIER.TOP_Z + HOUSING.COVER_CLEARANCE, self.front_top_z))
                   for x in ((FULL_WIDTH.start, FULL_WIDTH.start + self.SIDE_WALL),
                             (FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end))]
         # right: straight bar from the arm top up to the sliding panel recess, back to the main body (side screw into its insert block)
         sides.append(box_between((FULL_WIDTH.end - self.SIDE_WALL, FULL_WIDTH.end),
-                                 (HOUSING.PCB_PLATE_FRONT_Y - 0.01, MAIN_BODY.FRONT_Y - HOUSING.COVER_CLEARANCE),
+                                 (HOUSING.PCB_PLATE_FRONT_Y - HOUSING.COVER_CLEARANCE - 0.01, MAIN_BODY.FRONT_Y - HOUSING.COVER_CLEARANCE),
                                  (self.ARM_TOP_Z - 0.01, MAIN_BODY.right_pocket_bottom_z)))
+        # lid at the top, from the front wall back to the front of the PCB holder (with clearance)
+        lid = box_between(FULL_WIDTH, (self.front_y, HOUSING.PCB_PLATE_FRONT_Y - HOUSING.COVER_CLEARANCE),
+                          (self.front_top_z - self.LID, self.front_top_z))
         plenum = box_between(self.plenum_x, (self.front_y, self.PLENUM_BACK_Y), (self.BOTTOM_Z, self.PLENUM_TOP_Z))
         arms = [box_between(x, (self.PLENUM_BACK_Y - self.WALL, back_y), (self.BOTTOM_Z, self.ARM_TOP_Z))
                 for x, back_y, _, _ in self.arms()]
-        body = fuse_all([front, *sides, plenum, *arms]) - self.front_chamfer()
+        body = fuse_all([front, *sides, lid, plenum, *arms]) - self.front_chamfer()
         for chamfer in self.side_chamfers() + self.arm_corner_chamfers():
             body -= chamfer
         return body
