@@ -31,6 +31,7 @@ uv sync
 | `extruder_body_sherpa.step`| main body with Goliath carrier and fan wedges | back side on the bed |
 | `pcb_holder.step`          | PCB holder with front bearing seat, idler pin seat and filament guides | flat, inside up |
 | `motor_plate.step`         | motor plate with rear bearing seat and rear idler pin seat | flat |
+| `fan_duct.step`            | 5020 part cooling duct with front cover (simplified, mounting still open) | front wall on the bed |
 
 ## Hardware
 
@@ -43,6 +44,7 @@ uv sync
 | 2 | M3x8 DIN 912 | PCB holder lugs to main body |
 | 2 | M3x12 | 2515 fan (cuts into the fan holes) |
 | 4 | M2.5x5 DIN 912 | Goliath |
+| 2 | ST4.8x16 DIN 7981 (self-tapping, pan head) | 5020 fan to the fan duct |
 
 The Sherpa parts (gears, bearings, shafts, idler arm, thumbscrew, spring) are used as in the original.
 
@@ -59,6 +61,7 @@ module is cheap. Each module ends with one ready instance (`SHERPA`, `GOLIATH_CA
 | `sherpa.py` | `Sherpa`: Sherpa parts placed in SV08 coordinates (one rigid transformation) |
 | `goliath_carrier.py` | `GoliathCarrier`: plate below the housing, Goliath placement, 2515 fan wedges |
 | `housing.py` | `HousingLayout` (shared axes, posts, clearances), `PcbHolder`, `FilamentGuides`, `MotorPlate` |
+| `fan_duct.py` | `FanDuct`: 5020 part cooling duct combined with the front cover |
 | `main_body.py` | `MainBody`: block with holes and pockets, fused with the carrier |
 | `fasteners.py` | `Fasteners`: screws and heat-set inserts (models from the SV08 and Sherpa STEPs) |
 | `assembly.py` | `Toolhead`: placed parts and the named, coloured STEP tree |

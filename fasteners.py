@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from functools import cache, cached_property
 
-from build123d import Align, Box, Pos, Rot, Shape
+from build123d import Align, Box, Cylinder, Pos, Rot, Shape
 
 import common
-from geometry import XZ
+from fan_duct import FAN_DUCT
+from geometry import ALIGN_BOTTOM, XZ
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
 from housing import HOUSING
 from sherpa import SHERPA
@@ -88,6 +89,14 @@ def heat_insert(opening: Vector3, direction: Vector3) -> Shape:
     return Pos(*opening) * _Z_TO_DIRECTION[direction] * _insert_template()
 
 
+def self_tapping_screw(head_face: Vector3, direction: Vector3, length: float, diameter: float = 4.8,
+                       head_diameter: float = 9.5, head_height: float = 3.5) -> Shape:
+    """Pan head self-tapping screw (DIN 7981) as simple cylinders: head behind `head_face`, shank in `direction`."""
+    shape = (Pos(0, 0, -head_height) * Cylinder(head_diameter / 2, head_height, align=ALIGN_BOTTOM)
+             + Cylinder(diameter / 2, length, align=ALIGN_BOTTOM))
+    return Pos(*head_face) * _Z_TO_DIRECTION[direction] * shape
+
+
 def _at_y(point: XZ, y: float) -> Vector3:
     return (point.x, y, point.z)
 
@@ -124,6 +133,9 @@ class Fasteners:
         for i, position in enumerate(carrier.goliath_screw_positions(), 1):
             parts.append((f"screw_M2_5x5_goliath_{i}",
                           screw((position.x, position.y, carrier.TOP_Z - carrier.HEAD_DEPTH), DOWN, 5, "M2.5")))
+        # 5020 fan: 2x ST4.8x16 from the front through the fan duct wall into the Ø4.4 ear bores
+        for i, ear in enumerate(FAN_DUCT.FAN_EARS, 1):
+            parts.append((f"screw_ST4_8x16_fan5020_{i}", self_tapping_screw(_at_y(ear, FAN_DUCT.front_y), BACK, 16)))
         return parts
 
 

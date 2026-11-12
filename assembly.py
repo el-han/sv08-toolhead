@@ -9,6 +9,7 @@ from functools import cached_property
 from build123d import Box, Color, Compound, Location, Pos, Shape
 
 import common
+from fan_duct import FAN_DUCT
 from fasteners import FASTENERS
 from goliath_carrier import GOLIATH_CARRIER
 from housing import MOTOR_PLATE, PCB_HOLDER
@@ -37,11 +38,14 @@ class RemovedScrew:
 # M2.5 of the 5020 (fan no longer attached to the carrier)
 REMOVED_SCREWS = [RemovedScrew(-322.65, -133.35, "Y"), RemovedScrew(-361.35, -153.95, "Y"),
                   RemovedScrew(-347.2, -129.65, "X"), RemovedScrew(-360.85, -166.95, "Y")]
-FRONT_5020_PARTS = ["5020_turbofan", "air_duct_5020", "cover_plate3", "M2_5X8"]
+FRONT_5020_PARTS = ["5020_turbofan"]
+# replaced by the new fan duct (fan_duct.py): original duct, its cover plate and their screws
+REPLACED_BY_FAN_DUCT = ["air_duct_5020", "cover_plate3", "M2_5X8"]
 FAN_2515 = "2515_pipe_cooling_fan"
 
 # ---------------------------------------------------------------- colours and names
-NEW_PART_COLORS = {"MainBody": (0.15, 0.65, 0.35), "PcbHolder": (0.20, 0.55, 0.80), "MotorPlate": (0.85, 0.75, 0.20)}
+NEW_PART_COLORS = {"MainBody": (0.15, 0.65, 0.35), "PcbHolder": (0.20, 0.55, 0.80), "MotorPlate": (0.85, 0.75, 0.20),
+                   "FanDuct": (0.80, 0.30, 0.30)}
 GOLIATH_COLOR = (0.85, 0.50, 0.15)
 SILVER, GOLD = (0.80, 0.80, 0.82), (0.85, 0.75, 0.25)   # screws / heat-set inserts
 SHERPA_COLORS = [("heat_insert", GOLD), ("motor", (0.25, 0.25, 0.28)), ("gear_50t", (0.80, 0.65, 0.25)),
@@ -133,13 +137,13 @@ class Toolhead:
     def new_parts(self) -> list[tuple[str, Shape]]:
         """New printed parts and the Goliath (the parts checked for collisions)."""
         return [("MainBody", MAIN_BODY.solid), ("PcbHolder", PCB_HOLDER.solid), ("MotorPlate", MOTOR_PLATE.solid),
-                ("Goliath", GOLIATH_CARRIER.goliath)]
+                ("FanDuct", FAN_DUCT.solid), ("Goliath", GOLIATH_CARRIER.goliath)]
 
     @property
     def printed_parts(self) -> list[tuple[str, Shape]]:
         """(file name, shape) of the parts to print."""
         return [("extruder_body_sherpa", MAIN_BODY.solid), ("pcb_holder", PCB_HOLDER.solid),
-                ("motor_plate", MOTOR_PLATE.solid)]
+                ("motor_plate", MOTOR_PLATE.solid), ("fan_duct", FAN_DUCT.solid)]
 
     @property
     def fasteners(self) -> list[tuple[str, Shape]]:
@@ -158,7 +162,8 @@ class Toolhead:
             if ("shoulder_screws" in label and "4xM3" in label) or "adapter_plate" in label:
                 parts.append(PlacedPart(label, "PCB raised", pcb_raise * shape))   # PCBs and their screws
                 continue
-            if common.is_removed_sv08_part(label) or is_removed_screw(label, shape):
+            if (common.is_removed_sv08_part(label) or is_removed_screw(label, shape)
+                    or any(key in label for key in REPLACED_BY_FAN_DUCT)):
                 continue
             if "proximity_switch" in label:                          # remove the cable of the Eddy probe
                 shape = shape - Pos(-352.5, 239.8, -182.5) * Box(3.4, 3.4, 15.9)
