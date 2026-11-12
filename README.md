@@ -48,15 +48,20 @@ The Sherpa parts (gears, bearings, shafts, idler arm, thumbscrew, spring) are us
 
 ## Code
 
+Every part is a class whose `solid` is built on first access (`functools.cached_property`), so importing a
+module is cheap. Each module ends with one ready instance (`SHERPA`, `GOLIATH_CARRIER`, `HOUSING`,
+`PCB_HOLDER`, `MOTOR_PLATE`, `MAIN_BODY`, `FASTENERS`, `TOOLHEAD`).
+
 | Module | Content |
 |--------|---------|
+| `geometry.py` | value types (`XZ`, `XY`, `Span`, `Boss`, `Rect`) and primitive builders (`cylinder_along_y`, `box_between`, ...) |
 | `common.py` | paths, filament axis, SV08 STEP loader, list of dropped SV08 parts |
-| `sherpa.py` | Sherpa parts placed in SV08 coordinates (one rigid transformation) |
-| `goliath_carrier.py` | carrier plate below the housing, Goliath placement, 2515 fan wedges |
-| `housing.py` | PCB holder, motor plate, filament guides, clearances |
-| `extruder_body.py` | main body (block with holes and pockets, fused with the carrier) |
-| `fasteners.py` | screws and heat-set inserts (models from the SV08 and Sherpa STEPs) |
-| `assembly.py` | placed parts and the named, coloured STEP tree |
+| `sherpa.py` | `Sherpa`: Sherpa parts placed in SV08 coordinates (one rigid transformation) |
+| `goliath_carrier.py` | `GoliathCarrier`: plate below the housing, Goliath placement, 2515 fan wedges |
+| `housing.py` | `HousingLayout` (shared axes, posts, clearances), `PcbHolder`, `FilamentGuides`, `MotorPlate` |
+| `main_body.py` | `MainBody`: block with holes and pockets, fused with the carrier |
+| `fasteners.py` | `Fasteners`: screws and heat-set inserts (models from the SV08 and Sherpa STEPs) |
+| `assembly.py` | `Toolhead`: placed parts and the named, coloured STEP tree |
 | `render.py`, `check.py` | entry points |
 
 Coordinates are those of the Sovol STEP assembly (mm): X to the right, Y to the back, Z up, seen from
