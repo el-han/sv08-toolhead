@@ -204,3 +204,13 @@ class Toolhead:
 
 
 TOOLHEAD = Toolhead()
+
+
+def colored_parts() -> list[tuple[Shape, RGB]]:
+    """All parts of the assembly with the colours of the STEP tree."""
+    t = TOOLHEAD
+    return ([(shape, NEW_PART_COLORS[name]) for name, shape in t.new_parts if name in NEW_PART_COLORS]
+            + [(GOLIATH_CARRIER.goliath, GOLIATH_COLOR)]
+            + [(p.shape, color_for(p.name, SHERPA_COLORS, SHERPA_DEFAULT_COLOR)) for p in t.sherpa_parts]
+            + [(shape, GOLD if "insert" in name else SILVER) for name, shape in t.fasteners]
+            + [(p.shape, color_for(p.name, SV08_COLORS, SV08_DEFAULT_COLOR)) for p in t.sv08_parts])
