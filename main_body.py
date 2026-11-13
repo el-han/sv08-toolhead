@@ -41,6 +41,12 @@ class MainBody:
     # block on the front face (below the head of the carriage screw at z -197.4)
     COVER_SCREW_Z = -201.8
 
+    # side holes for the sliding panel: in the inner walls of the belt clamp recesses, on the axes of the Ø2.5 holes
+    # in the panel flanges, open to the back face (the panel slides in from the back)
+    PANEL_HOLE_Y = 246.37
+    PANEL_HOLE_Z = (-165.67, -187.67)
+    PANEL_HOLE, PANEL_HOLE_DEPTH = 5.0, 5.0
+
     # screws of the old motor (dropped), identified by their position
     OLD_MOTOR_SCREWS = (XZ(-322.65, -133.35), XZ(-361.35, -153.95))
 
@@ -107,12 +113,33 @@ class MainBody:
         return block - cylinder_along_x((x - HEAT_INSERT_HOLE_DEPTH, self.cover_insert_y, self.COVER_SCREW_Z),
                                         HEAT_INSERT_HOLE / 2, HEAT_INSERT_HOLE_DEPTH + 0.1)
 
+    @property
+    def lug_boss_bottom_z(self) -> float:
+        """Bottom of the bosses below the lug inserts: insert hole depth from the top of the carrier."""
+        return GOLIATH_CARRIER.TOP_Z - HEAT_INSERT_HOLE_DEPTH
+
+    def panel_holes(self) -> list[Shape]:
+        """Ø5 x 5 side holes from the inner walls of the two side recesses inwards, open to the back."""
+        radius, depth = self.PANEL_HOLE / 2, self.PANEL_HOLE_DEPTH
+        holes = []
+        for pocket in self.pockets()[:2]:
+            box = pocket.bounding_box()
+            left = box.max.X < FULL_WIDTH.middle
+            wall_x = box.max.X if left else box.min.X
+            x = (wall_x - 0.1, wall_x + depth) if left else (wall_x - depth, wall_x + 0.1)
+            for z in self.PANEL_HOLE_Z:
+                holes.append(cylinder_along_x((x[0], self.PANEL_HOLE_Y, z), radius, x[1] - x[0]))
+                holes.append(box_between(x, (self.PANEL_HOLE_Y, self.BACK_Y + 1), (z - radius, z + radius)))
+        return holes
+
     def block(self) -> Shape:
         block = self.block_outline()
         for axis, radius in self.THROUGH_HOLES.values():
             block -= cylinder_along_y(axis, radius, self.FRONT_Y - 1, self.BACK_Y + 1)
         for pocket in self.pockets():
             block -= pocket
+        for hole in self.panel_holes():
+            block -= hole
         # screws of neighbouring parts that reach into the block (counterbores/heads)
         for label, part in common.sv08_parts():
             if "screw" not in label or common.is_removed_sv08_part(label) or self.is_old_motor_screw(part):
@@ -128,8 +155,16 @@ class MainBody:
         body = self.block() + GOLIATH_CARRIER.solid      # the carrier is connected directly to the back wall
         body += self.cover_insert_block()
         carrier = GOLIATH_CARRIER
-        for hole in HOUSING.lug_holes:                   # heat-set inserts for the lugs of the PCB holder
-            body -= cylinder_along_z(hole, HEAT_INSERT_HOLE / 2, carrier.BOTTOM_Z - 1, carrier.TOP_Z + 1)
+        # heat-set inserts for the lugs of the PCB holder: the carrier is thinner than the insert hole is deep, so a
+        # boss below it
+        for hole in HOUSING.lug_holes:
+            body += cylinder_along_z(hole, HEAT_INSERT_HOLE / 2 + HOUSING.COVER_INSERT_WALL, self.lug_boss_bottom_z,
+                                     carrier.BOTTOM_Z + 0.01)
+            if hole.x < FULL_WIDTH.middle:               # left: close the gap to the 45° flank of the front fan wedge
+                radius = HEAT_INSERT_HOLE / 2 + HOUSING.COVER_INSERT_WALL
+                body += box_between((FULL_WIDTH.start, carrier.FAN_BACK_X - 0.1), (hole.y - radius - 3.0, hole.y),
+                                    (self.lug_boss_bottom_z, carrier.BOTTOM_Z + 0.01))
+            body -= cylinder_along_z(hole, HEAT_INSERT_HOLE / 2, self.lug_boss_bottom_z - 1, carrier.TOP_Z + 1)
         # clearances for 50t gear, pinion, rear bearing and idler
         for cut in HOUSING.clearances:
             if cut.bounding_box().max.Y > HOUSING.PCB_PLATE_BACK_Y:

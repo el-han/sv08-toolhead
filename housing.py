@@ -13,7 +13,7 @@ Hole dimensions as in the original Sherpa (measured in the STEP):
   MR85 front   Ø8.2  y 218.98..221.55, in front of it Ø7.0 up to 218.25
   MR85 rear    Ø8.2  y 243.35..245.85, behind it Ø6.6 up to 246.05
   idler pin    Ø3.3  front y 219.1..221.25 (PCB holder), rear y 235.35..238.75 (boss on the motor plate)
-  thumbscrew insert M3x5x4  Ø4.8 along X, x -333.4..-328.8 (thumbscrew from +X through the idler arm)
+  thumbscrew insert M3x5x4  along X (here Ø4 as all inserts), x -333.4..-328.8 (thumbscrew from +X through the idler arm)
 """
 from __future__ import annotations
 
@@ -22,14 +22,12 @@ from functools import cached_property
 
 from build123d import Align, Box, Pos, Rot, Shape
 
-from common import CLEARANCE, FILAMENT_AXIS
+from common import CLEARANCE, FILAMENT_AXIS, HEAT_INSERT_HOLE, HEAT_INSERT_HOLE_DEPTH
 from geometry import (XY, XZ, Boss, Rect, Span, box_between, cylinder_along_x, cylinder_along_y,
                       cylinder_along_z, fuse_all, largest_solid, rotation_about_y)
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
 from sherpa import SHERPA
 
-HEAT_INSERT_HOLE = 4.8                  # heat-set insert M3x5x4 (as in the Sherpa): Ø4.8 hole
-HEAT_INSERT_HOLE_DEPTH = 5.5
 M3_CLEARANCE_RADIUS = 1.7
 
 

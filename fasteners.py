@@ -122,11 +122,11 @@ class Fasteners:
         # PCB shoulder screws: upper insert in the PCB holder, lower one in the Goliath carrier
         for i, point in enumerate((layout.PCB_INSERT, carrier.PCB_SCREW), 1):
             parts.append((f"heat_insert_pcb_{i}", heat_insert(_at_y(point, layout.PCB_PLATE_FRONT_Y), BACK)))
-        # lugs of the PCB holder: M3x8 from the top, heat-set insert from below in the Goliath carrier
+        # lugs of the PCB holder: M3x8 from the top, heat-set insert flush with the top of the Goliath carrier
         for i, hole in enumerate(layout.lug_holes, 1):
             parts.append((f"screw_M3x8_lug_{i}",
                           screw((hole.x, hole.y, layout.BOTTOM_Z + layout.LUG_THICKNESS), DOWN, 8)))
-            parts.append((f"heat_insert_lug_{i}", heat_insert((hole.x, hole.y, carrier.BOTTOM_Z), UP)))
+            parts.append((f"heat_insert_lug_{i}", heat_insert((hole.x, hole.y, carrier.TOP_Z), DOWN)))
         # 2515 fan: 2x M3x12 from the outside through the wedges into the upper fan holes
         for i, (y, z) in enumerate(carrier.FAN_HOLES, 1):
             parts.append((f"screw_M3x12_fan_{i}", screw((FULL_WIDTH.start, y, z), RIGHT, 12)))

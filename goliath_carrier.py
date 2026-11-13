@@ -15,7 +15,7 @@ from functools import cached_property
 from build123d import Plane, Polyline, Pos, Rot, Shape, extrude, import_step, make_face
 
 import common
-from common import FILAMENT_AXIS
+from common import FILAMENT_AXIS, HEAT_INSERT_HOLE, HEAT_INSERT_HOLE_DEPTH
 from geometry import XY, XZ, Span, box_between, cylinder_along_x, cylinder_along_y, cylinder_along_z, fuse_all
 from sherpa import SHERPA
 
@@ -47,7 +47,6 @@ class GoliathCarrier:
     # PCB raised so that the lower shoulder screw sits in the middle of the carrier
     PCB_RAISE = (BOTTOM_Z + TOP_Z) / 2 - (-153.2)
     PCB_SCREW = XZ(-336.5, -153.2 + PCB_RAISE)
-    PCB_SCREW_HOLE_RADIUS = 2.0
 
     # 2515 hotend fan: dimensions as on the original (+X) side; fan and wedges are then mirrored
     # about the filament axis to the -X side
@@ -55,7 +54,9 @@ class GoliathCarrier:
     FAN_FACE_X = -323.80                          # mirrored: fan face at x=-347.6
     FAN_SHIFT_X = FAN_FACE_X - (-328.70)
     FAN_TOP_ORIGINAL = -165.075                   # top of the 2515 in the SV08 model (without cables)
-    FAN_RAISE = BOTTOM_Z - FAN_TOP_ORIGINAL       # fan directly below the carrier
+    # fan just below the bosses of the lug inserts (insert hole deeper than the carrier), 0.2 mm clearance
+    FAN_DROP = HEAT_INSERT_HOLE_DEPTH - THICKNESS + 0.2
+    FAN_RAISE = BOTTOM_Z - FAN_DROP - FAN_TOP_ORIGINAL
     FAN_HOLES = ((217.6, -167.57 + FAN_RAISE), (237.6, -167.57 + FAN_RAISE))   # (y, z) upper fan holes
     FAN_BACK_X = 2 * FILAMENT_AXIS.x - (FAN_FACE_X + 15.0)   # back side of the mirrored 2515 (outside)
     FAN_WEDGE_WALL = 1.8                          # wall around the hole in the wedge
@@ -118,7 +119,7 @@ class GoliathCarrier:
             head_bottom = self.TOP_Z - self.HEAD_DEPTH
             plate -= cylinder_along_z(screw, self.HEAD_DIAMETER / 2, head_bottom, head_bottom + 10)
         # lower PCB shoulder screw enters the plate from the front (heat-set insert)
-        plate -= cylinder_along_y(self.PCB_SCREW, self.PCB_SCREW_HOLE_RADIUS, self.FRONT_Y - 1, self.FRONT_Y + 5)
+        plate -= cylinder_along_y(self.PCB_SCREW, HEAT_INSERT_HOLE / 2, self.FRONT_Y - 1, self.FRONT_Y + HEAT_INSERT_HOLE_DEPTH)
         plate += self.fan_wedges()
         for hole_y, hole_z in self.FAN_HOLES:
             start_x = FULL_WIDTH.start - 1

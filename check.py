@@ -40,7 +40,7 @@ def is_collision(volume: float) -> bool:
 
 
 def is_intended_contact(new_part: str, other: str) -> bool:
-    if "heat_insert" in other:                          # press fit (Ø5.0 in Ø4.8)
+    if "heat_insert" in other:                          # press fit (Ø5.0 in Ø4)
         return True
     return new_part == "Goliath" and "screw" in other   # thread engagement in the Goliath core holes
 

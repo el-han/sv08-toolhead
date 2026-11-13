@@ -46,7 +46,7 @@ uv sync
 
 | Qty | Part | Where |
 |----:|------|-------|
-| 11 | heat-set insert M3x5x4 (Ø4.8 hole) | 4 posts, 2 lugs (carrier), 1 PCB holder + 1 carrier (PCBs), 2 PCB holder sides + 1 main body front (fan duct) |
+| 11 | heat-set insert M3x5x4 (hole Ø4 x 6.7) | 4 posts, 2 lugs (carrier), 1 PCB holder + 1 carrier (PCBs), 2 PCB holder sides + 1 main body front (fan duct) |
 | 1 | heat-set insert M3x5x4 | idler thumbscrew (as in the Sherpa) |
 | 4 | M3x12 DIN 912 | motor plate to PCB holder |
 | 5 | M3x6 DIN 912 | 2 motor, 3 fan duct (from the sides) |
@@ -63,7 +63,7 @@ The Sherpa parts (gears, bearings, shafts, idler arm, thumbscrew, spring) are us
 1. **Print** the four parts from `out/` in ASA, orientation as in the table above.
 2. **Heat-set inserts:** 4 into the posts of the PCB holder (from the motor side), 1 into the PCB holder front
    (upper PCB screw), 2 into the sides of the PCB holder (fan duct), 1 into the thumbscrew holder; in the main
-   body 2 from below into the carrier (lugs), 1 into the carrier front (lower PCB screw) and 1 from the right
+   body 2 from the top into the carrier (lugs, flush with the top), 1 into the carrier front (lower PCB screw) and 1 from the right
    into the block on the front face (fan duct).
 3. **Goliath:** into the carrier from below, 4x M2.5x5 from the top. **2515 fan:** onto the wedges at the
    left, 2x M3x12 from the outside.

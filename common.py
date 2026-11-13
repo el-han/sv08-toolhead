@@ -17,6 +17,8 @@ OUT = ROOT / "out"
 
 FILAMENT_AXIS = XY(-335.70, 225.05)     # filament axis = nozzle position (original, unchanged)
 ORIGINAL_NOZZLE_Z = -224.07             # original nozzle tip (unchanged)
+HEAT_INSERT_HOLE = 4.0                  # heat-set insert M3x5x4: Ø4 hole, 6.7 mm deep
+HEAT_INSERT_HOLE_DEPTH = 6.7
 CLEARANCE = 0.4                         # default clearance of cut-outs around neighbouring parts
 
 
