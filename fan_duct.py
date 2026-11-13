@@ -21,9 +21,9 @@ from build123d import Shape
 from common import FILAMENT_AXIS
 import math
 
-from geometry import XZ, Span, box_between, cylinder_along_x, cylinder_along_y, fuse_all, largest_solid, prism
+from geometry import XY, XZ, Span, box_between, cylinder_along_x, cylinder_along_y, cylinder_along_z, fuse_all, largest_solid, prism
 from goliath_carrier import FULL_WIDTH, GOLIATH_CARRIER
-from housing import HOUSING
+from housing import HOUSING, PCB_HOLDER
 from main_body import MAIN_BODY
 
 
@@ -42,6 +42,7 @@ class FanDuct:
     WALL = 1.2
     FRONT_WALL = 2.0
     LID = 2.0                                                  # lid at the top, back to the PCB holder
+    CABLE_HOLE_LENGTH = 8.0                                    # cable hole in the lid in front of the cable bar
     SIDE_WALL = HOUSING.COVER_SIDE_WALL                        # left and right side walls of the front cover
     BOTTOM_Z = -220.7                                          # as the original (nozzle tip at -224.07)
     PLENUM_TOP_Z = -208.7                                      # just below the fan (fan bottom -208.27/-208.66)
@@ -192,12 +193,25 @@ class FanDuct:
                       (x0, y1 + 1, floor - 0.1), (x0, y1 + 1, top + 1)], (1, 0, 0), x1 - x0)
         return deflector - back - self.front_chamfer()
 
+    def cable_hole(self) -> Shape:
+        """Hole in the lid in front of the cable bar of the PCB holder, as wide as the bar: open to the back edge,
+        semicircle at the front."""
+        x = PCB_HOLDER.cable_bar_x
+        radius = x.length / 2
+        lid_back_y = HOUSING.PCB_PLATE_FRONT_Y - HOUSING.COVER_CLEARANCE
+        center_y = lid_back_y - self.CABLE_HOLE_LENGTH + radius
+        back_y = lid_back_y + 1
+        z = (self.front_top_z - self.LID - 1, self.front_top_z + 1)
+        square = box_between((x.middle - radius, x.middle + radius), (center_y, back_y), z)
+        return square + cylinder_along_z(XY(x.middle, center_y), radius, *z)
+
     @cached_property
     def solid(self) -> Shape:
         duct = self.outer() - self.cavity() + self.deflector()
         for slot in self.outlet_slots():
             duct -= slot
         # air intake of the fan through the front wall
+        duct -= self.cable_hole()
         duct -= cylinder_along_y(self.FAN_AXIS, self.FAN_INTAKE / 2, self.front_y - 1, self.FAN_FRONT_Y + 0.1)
         for ear in self.FAN_EARS:
             duct -= cylinder_along_y(ear, self.SCREW_HOLE / 2, self.front_y - 1, self.FAN_FRONT_Y + 1)

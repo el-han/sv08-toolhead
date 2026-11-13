@@ -267,6 +267,9 @@ class PcbHolder:
     ARM_SLOPE = 17.8                     # inclination of this edge towards +X (degrees)
     ARM_CLEARANCE = 0.5                  # clearance between PCB holder and idler arm
     INSERT_HOLDER_WALL = 1.5             # wall around the thumbscrew insert
+    # cable holder: bar standing up on the top at the left edge, waist in the middle for a cable tie
+    CABLE_BAR_WIDTH, CABLE_BAR_DEPTH, CABLE_BAR_HEIGHT = 10.0, 4.0, 14.0
+    CABLE_BAR_WAIST, CABLE_BAR_WAIST_HEIGHT = 6.0, 4.0     # width / height of the waist
 
     def __init__(self, layout: HousingLayout):
         self.layout = layout
@@ -353,6 +356,24 @@ class PcbHolder:
                            (layout.PCB_PLATE_FRONT_Y + layout.PCB_PLATE_THICKNESS - 0.01, center.Y + radius),
                            (center.Z - radius, center.Z + radius))
 
+    @property
+    def cable_bar_x(self) -> Span:
+        start = self.layout.pcb_plate_x.start
+        return Span(start, start + self.CABLE_BAR_WIDTH)
+
+    def cable_bar(self) -> Shape:
+        """Cable holder: bar on the top at the left edge, from the front face back, with a waist in the middle."""
+        layout = self.layout
+        x, top = self.cable_bar_x, layout.pcb_plate.z.end
+        y = (layout.PCB_PLATE_FRONT_Y, layout.PCB_PLATE_FRONT_Y + self.CABLE_BAR_DEPTH)
+        bar = box_between(x, y, (top - 0.01, top + self.CABLE_BAR_HEIGHT))
+        notch = (self.CABLE_BAR_WIDTH - self.CABLE_BAR_WAIST) / 2
+        middle = top + self.CABLE_BAR_HEIGHT / 2
+        waist_z = (middle - self.CABLE_BAR_WAIST_HEIGHT / 2, middle + self.CABLE_BAR_WAIST_HEIGHT / 2)
+        for side in ((x.start - 1, x.start + notch), (x.end - notch, x.end + 1)):
+            bar -= box_between(side, (y[0] - 1, y[1] + 1), waist_z)
+        return bar
+
     def arm_clearance_cuts(self, part: Shape) -> list[Shape]:
         """Simplified clearance cut to the idler arm: per swing position the box around the part of the arm
         that comes close to `part`, enlarged by ARM_CLEARANCE and limited to the outline of `part`."""
@@ -389,7 +410,7 @@ class PcbHolder:
     def solid(self) -> Shape:
         upper_guide, lower_guide = self.guides.solids
         holder = self.plate() + upper_guide + lower_guide + self.insert_holder() + self.insert_reinforcement()
-        holder += self.cover_insert_blocks()
+        holder += self.cover_insert_blocks() + self.cable_bar()
         holder -= self.pcb_insert_boss_arm_cut()
         for cut in self.arm_clearance_cuts(self.insert_holder()):
             holder -= cut
