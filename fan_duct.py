@@ -55,6 +55,7 @@ class FanDuct:
     DEFLECTOR_LENGTH = 7.0                                     # length of the sharp top edge
     OUTLET_HEIGHT = 4.0                                        # slot in the inner arm wall, from the bottom
     OUTLET_FROM_Y = 216.0                                      # slots start behind the plenum
+    NOZZLE_OUTLET = (12.0, 10.0, 8.0)                          # trapezoid in the floor at the back wall: long side, short side, depth
     ARM_CORNER_CHAMFER = 0.5                                   # 45° at the back outer corner, fraction of the arm width
 
     # fan screws: self-tapping ST4.8 (DIN 7981), clearance hole in the front wall
@@ -173,6 +174,16 @@ class FanDuct:
                                      (self.BOTTOM_Z - 0.5, self.BOTTOM_Z + self.OUTLET_HEIGHT)))
         return slots
 
+    def nozzle_outlet(self) -> Shape:
+        """Trapezoidal opening in the plenum floor at the back wall, centred in front of the nozzle; the long side
+        lies at the back wall (towards the nozzle)."""
+        long, short, depth = self.NOZZLE_OUTLET
+        x, y1 = FILAMENT_AXIS.x, self.PLENUM_BACK_Y + 0.01
+        y0 = y1 - 0.01 - depth
+        z0 = self.BOTTOM_Z - 1
+        outline = [(x - short / 2, y0, z0), (x + short / 2, y0, z0), (x + long / 2, y1, z0), (x - long / 2, y1, z0)]
+        return prism(outline, (0, 0, 1), self.WALL + 1.01)
+
     def deflector(self) -> Shape:
         """Air deflector at the front of the plenum (as in the original, about 1/3 from the left), cross-section:
         a vertical wall from the plenum top to the floor and from its sharp top edge a 45° wall sloping down to
@@ -210,6 +221,7 @@ class FanDuct:
         duct = self.outer() - self.cavity() + self.deflector()
         for slot in self.outlet_slots():
             duct -= slot
+        duct -= self.nozzle_outlet()
         # air intake of the fan through the front wall
         duct -= self.cable_hole()
         duct -= cylinder_along_y(self.FAN_AXIS, self.FAN_INTAKE / 2, self.front_y - 1, self.FAN_FRONT_Y + 0.1)
