@@ -227,25 +227,26 @@ class FilamentGuides:
 
     @property
     def top_z(self) -> float:
-        return self.shaft_z + self.UPPER_TOP
+        """Top of the upper guide: flush with the top of the PCB holder (lower than in the original)."""
+        return min(self.shaft_z + self.UPPER_TOP, self.layout.pcb_plate.z.end)
 
     def channel_cuts(self) -> list[Shape]:
         """Guide hole and PTFE bore of the upper guide."""
         z = self.shaft_z
-        return [cylinder_along_z(FILAMENT_AXIS, self.GUIDE_HOLE / 2, z + self.UPPER_BOTTOM - 1, z + self.UPPER_TOP + 1),
-                cylinder_along_z(FILAMENT_AXIS, self.BORE / 2, z + self.UPPER_BORE_BOTTOM, z + self.UPPER_TOP + 1)]
+        return [cylinder_along_z(FILAMENT_AXIS, self.GUIDE_HOLE / 2, z + self.UPPER_BOTTOM - 1, self.top_z + 1),
+                cylinder_along_z(FILAMENT_AXIS, self.BORE / 2, z + self.UPPER_BORE_BOTTOM, self.top_z + 1)]
 
     @cached_property
     def solids(self) -> tuple[Shape, Shape]:
         """(upper, lower) guide."""
         layout, z = self.layout, self.shaft_z
         outer = self.BORE / 2 + self.WALL
-        upper = cylinder_along_z(FILAMENT_AXIS, outer, z + self.UPPER_BOTTOM, z + self.UPPER_TOP)
+        upper = cylinder_along_z(FILAMENT_AXIS, outer, z + self.UPPER_BOTTOM, self.top_z)
         lower = cylinder_along_z(FILAMENT_AXIS, outer, layout.BOTTOM_Z, z + self.LOWER_TOP)
         # webs towards the PCB holder, as wide as the tube (within the height of the holder)
         web_x = (FILAMENT_AXIS.x - outer, FILAMENT_AXIS.x + outer)
         web_y = (layout.PCB_PLATE_FRONT_Y + layout.PCB_PLATE_THICKNESS - 0.01, FILAMENT_AXIS.y)
-        upper += box_between(web_x, web_y, (z + self.UPPER_BOTTOM, min(z + self.UPPER_TOP, layout.pcb_plate.z.end)))
+        upper += box_between(web_x, web_y, (z + self.UPPER_BOTTOM, self.top_z))
         lower += box_between(web_x, web_y, (layout.BOTTOM_Z, z + self.LOWER_TOP))
         # bores after the webs, so they stay free
         for cut in self.channel_cuts():
@@ -280,13 +281,18 @@ class PcbHolder:
         return cylinder_along_y(self.layout.PCB_INSERT, HEAT_INSERT_HOLE / 2, y0 - 0.1, y0 + HEAT_INSERT_HOLE_DEPTH)
 
     def lugs(self) -> Shape:
-        """Mounting lugs to the main body (M3 from the top, heat-set insert in the Goliath carrier)."""
+        """Mounting lugs to the main body (M3 from the top, heat-set insert in the Goliath carrier), reaching forward
+        to the PCB plate."""
         layout = self.layout
         half, z0, z1 = layout.LUG_WIDTH / 2, layout.BOTTOM_Z, layout.BOTTOM_Z + layout.LUG_THICKNESS
         lugs = []
         for post, hole in zip(layout.posts, layout.lug_holes):
             lug = box_between((min(post.x, hole.x), max(post.x, hole.x)), (hole.y - half, hole.y + half), (z0, z1))
             lug += cylinder_along_z(hole, half, z0, z1)
+            # forward to the PCB plate (printability), within the narrowed holder width (fan duct side walls)
+            inner_x = layout.pcb_plate_x.start if hole.x < post.x else layout.pcb_plate_x.end
+            lug += box_between((min(post.x, inner_x), max(post.x, inner_x)),
+                               (layout.PCB_PLATE_FRONT_Y + layout.PCB_PLATE_THICKNESS - 0.01, hole.y), (z0, z1))
             lug -= cylinder_along_z(hole, M3_CLEARANCE_RADIUS, z0 - 1, z1 + 1)
             lugs.append(lug)
         return fuse_all(lugs)
