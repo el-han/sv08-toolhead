@@ -164,7 +164,8 @@ class MainBody:
                 radius = HEAT_INSERT_HOLE / 2 + HOUSING.COVER_INSERT_WALL
                 body += box_between((FULL_WIDTH.start, carrier.FAN_BACK_X - 0.1), (hole.y - radius - 3.0, hole.y),
                                     (self.lug_boss_bottom_z, carrier.BOTTOM_Z + 0.01))
-            body -= cylinder_along_z(hole, HEAT_INSERT_HOLE / 2, self.lug_boss_bottom_z - 1, carrier.TOP_Z + 1)
+            # exactly as deep as the insert hole (does not cut into the fan wedge below the boss)
+            body -= cylinder_along_z(hole, HEAT_INSERT_HOLE / 2, self.lug_boss_bottom_z, carrier.TOP_Z + 1)
         # clearances for 50t gear, pinion, rear bearing and idler
         for cut in HOUSING.clearances:
             if cut.bounding_box().max.Y > HOUSING.PCB_PLATE_BACK_Y:
